@@ -337,6 +337,7 @@ select#sortSel {
 }
 .map-legend .lg-item { display: flex; align-items: center; gap: 4px; }
 .map-legend .lg-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.map-legend .lg-line { width: 14px; height: 2px; flex: 0 0 auto; margin-top: 1px; }
 .map-zoom-btns { display: flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex: 0 0 auto; }
 .map-zoom-btns button {
   width: 32px;
@@ -755,10 +756,20 @@ const LEGEND = [
   ["Fitness & Beauty", "fitness"],
   ["Family & Leisure", "family"],
 ];
+const ROUTE_LEGEND = [
+  ["Tram 86", "#8e2a52", false],
+  ["Bus 903", "#8465c7", true],
+  ["Bus 561", "#6b3f76", true],
+];
 function renderLegend() {
-  document.getElementById("mapLegend").innerHTML = LEGEND.map(
+  const catHtml = LEGEND.map(
     ([label, k]) => `<span class="lg-item"><span class="lg-dot" style="background:var(--cat-${k})"></span>${label}</span>`
   ).join("");
+  const routeHtml = ROUTE_LEGEND.map(
+    ([label, color, dash]) =>
+      `<span class="lg-item"><span class="lg-line" style="background:${dash ? "none" : color};border-top:${dash ? "2px dashed " + color : "none"}"></span>${label}</span>`
+  ).join("");
+  document.getElementById("mapLegend").innerHTML = catHtml + routeHtml;
 }
 
 function mapInfoHtml(d) {
@@ -840,8 +851,8 @@ class PaletteClusterRenderer {
     const gid = `cg${clusterGradId++}`;
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${d}' height='${d}'>
       <defs><radialGradient id='${gid}' cx='50%' cy='50%' r='50%'>
-        <stop offset='0%' stop-color='rgba(${r},${g},${b},0.8)'/>
-        <stop offset='55%' stop-color='rgba(${r},${g},${b},0.5)'/>
+        <stop offset='0%' stop-color='rgba(${r},${g},${b},0.42)'/>
+        <stop offset='55%' stop-color='rgba(${r},${g},${b},0.22)'/>
         <stop offset='100%' stop-color='rgba(${r},${g},${b},0)'/>
       </radialGradient></defs>
       <circle cx='${canvasR}' cy='${canvasR}' r='${canvasR}' fill='url(#${gid})'/>
@@ -865,6 +876,86 @@ let mapMarkers = [];
 let homeMarker = null;
 let gmapsReady = false;
 
+/* Named route overlays. Tram 86 runs on fixed tracks, so transit directions
+   between its two termini reliably trace the real line. Bus routes run on
+   roads, so these are Google's best transit path between two real stops on
+   that route near Bundoora — a close approximation, not an official GTFS
+   shape (Maps JS API doesn't expose individual route geometry). */
+const TRANSIT_ROUTES = [
+  {
+    name: "Tram 86",
+    mode: "TRAM",
+    origin: "Bundoora RMIT tram terminus, VIC",
+    destination: "Northcote Plaza, Northcote VIC",
+    color: "#8e2a52",
+    weight: 4,
+    dash: false,
+  },
+  {
+    name: "Bus 903 (SmartBus)",
+    mode: "BUS",
+    origin: "La Trobe University, Bundoora VIC",
+    destination: "Greensborough Plaza, Greensborough VIC",
+    color: "#8465c7",
+    weight: 3,
+    dash: true,
+  },
+  {
+    name: "Bus 561",
+    mode: "BUS",
+    origin: "La Trobe University, Bundoora VIC",
+    destination: "Northland Shopping Centre, Preston VIC",
+    color: "#6b3f76",
+    weight: 3,
+    dash: true,
+  },
+];
+const dashedLine = {
+  path: "M 0,-1 0,1",
+  strokeOpacity: 0,
+  scale: 3,
+};
+
+function renderTransitRoutes() {
+  const directionsService = new google.maps.DirectionsService();
+  TRANSIT_ROUTES.forEach((route) => {
+    directionsService.route(
+      {
+        origin: route.origin,
+        destination: route.destination,
+        travelMode: "TRANSIT",
+        transitOptions: { modes: [route.mode] },
+      },
+      (result, status) => {
+        if (status !== "OK") {
+          console.warn(`Transit route "${route.name}" unavailable: ${status}`);
+          return;
+        }
+        new google.maps.DirectionsRenderer({
+          map: gmap,
+          directions: result,
+          suppressMarkers: true,
+          suppressInfoWindows: true,
+          preserveViewport: true,
+          polylineOptions: route.dash
+            ? {
+                strokeOpacity: 0,
+                strokeColor: route.color,
+                icons: [{ icon: { ...dashedLine, strokeColor: route.color, strokeOpacity: 0.85 }, offset: "0", repeat: "14px" }],
+                zIndex: 50,
+              }
+            : {
+                strokeColor: route.color,
+                strokeOpacity: 0.85,
+                strokeWeight: route.weight,
+                zIndex: 50,
+              },
+        });
+      }
+    );
+  });
+}
+
 function initMap() {
   gmap = new google.maps.Map(document.getElementById("gmap"), {
     center: REF,
@@ -874,6 +965,7 @@ function initMap() {
     mapTypeControl: false,
   });
   new google.maps.TransitLayer().setMap(gmap);
+  renderTransitRoutes();
   homeMarker = new google.maps.Marker({
     position: REF,
     map: gmap,
