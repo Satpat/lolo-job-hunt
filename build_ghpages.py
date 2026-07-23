@@ -1030,7 +1030,7 @@ const TRANSIT_ROUTES = [
     name: "Tram 86",
     mode: "TRAM",
     origin: "Bundoora RMIT tram terminus, VIC",
-    destination: "Northcote Plaza, Northcote VIC",
+    destination: "Waterfront City, Docklands VIC",
     color: "{ACCENT_HEX}",
     weight: 4,
     dash: false,
