@@ -345,7 +345,23 @@ select#sortSel {{
   font-weight: 500;
 }}
 .addr {{ color: var(--ink-dim); font-size: 13px; }}
-.rating {{ font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }}
+.rating {{
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  padding: 3px 8px 3px 6px;
+  border-radius: 5px;
+}}
+.rating svg {{ width: 10px; height: 10px; color: #d6a032; flex: 0 0 auto; }}
+:root[data-theme="dark"] .rating svg {{ color: #e8bc63; }}
+:root[data-theme="light"] .rating svg {{ color: #d6a032; }}
 
 .action-row {{ display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap; }}
 .btn {{
@@ -740,12 +756,20 @@ function catColorVar(grp) {{
 }}
 
 function mapsUrl(d) {{
+  const q = encodeURIComponent(`${{d.name}} ${{d.addr}}`);
+  if (d.id) return `https://www.google.com/maps/search/?api=1&query=${{q}}&query_place_id=${{d.id}}`;
   if (d.lat && d.lng) return `https://www.google.com/maps/search/?api=1&query=${{d.lat}},${{d.lng}}`;
   return `https://www.google.com/maps/search/?api=1&query=${{encodeURIComponent(d.addr)}}`;
 }}
 
 const CHECK_SVG =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>';
+const STAR_SVG =
+  '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.6l2.47 5.24 5.63.78-4.08 4.06.99 5.72L10 14.5l-5.01 2.9.99-5.72L1.9 7.62l5.63-.78L10 1.6z"/></svg>';
+function ratingChip(rating) {{
+  if (!rating) return "";
+  return `<span class="rating">${{STAR_SVG}}${{rating}}</span>`;
+}}
 
 function card(d) {{
   const k = catColorVar(d.grp);
@@ -763,7 +787,7 @@ function card(d) {{
     <div class="tag-row">
       <span class="tag" style="background:var(--cat-${{k}}-bg);color:var(--cat-${{k}})">${{d.cat}}</span>
       <span class="tag suburb">${{d.suburb}}</span>
-      ${{d.rating ? `<span class="rating">&#9733; ${{d.rating}}</span>` : ""}}
+      ${{ratingChip(d.rating)}}
       <span class="dist-badge">${{d.dist != null ? d.dist.toFixed(1) + " km" : ""}}</span>
     </div>
     <div class="addr">${{d.addr}}</div>
