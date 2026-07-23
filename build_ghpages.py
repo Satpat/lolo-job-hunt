@@ -892,7 +892,7 @@ function showMapInfo(d) {{
 }}
 
 function dotIcon(hex) {{
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='9' cy='9' r='6.5' fill='${{hex}}' stroke='white' stroke-width='2'/></svg>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='9' cy='9' r='6.5' fill='${{hex}}' fill-opacity='0.88' stroke='white' stroke-width='2'/></svg>`;
   return {{
     url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
     scaledSize: new google.maps.Size(18, 18),
@@ -906,6 +906,41 @@ function homeIcon() {{
     scaledSize: new google.maps.Size(36, 36),
     anchor: new google.maps.Point(18, 18),
   }};
+}}
+
+/* Cluster heatmap: same pink→burgundy palette as the rest of the site,
+   diluted with low opacity so the transit lines/labels underneath (the
+   actual point of the map) stay the visual focus, not the pin blobs. */
+const CLUSTER_STOPS = [
+  [246, 220, 231], // light pink, --accent-soft
+  [194, 68, 122], // rose, --cat-food
+  [90, 21, 48], // deep burgundy, near --cat-family
+];
+function lerp(a, b, t) {{ return a + (b - a) * t; }}
+function clusterColor(t) {{
+  const seg = t < 0.5 ? [CLUSTER_STOPS[0], CLUSTER_STOPS[1], t * 2] : [CLUSTER_STOPS[1], CLUSTER_STOPS[2], (t - 0.5) * 2];
+  const [c0, c1, tt] = seg;
+  return [Math.round(lerp(c0[0], c1[0], tt)), Math.round(lerp(c0[1], c1[1], tt)), Math.round(lerp(c0[2], c1[2], tt))];
+}}
+class PaletteClusterRenderer {{
+  render({{ count, position }}, stats) {{
+    const maxCount = Math.max(stats.clusters.markers.max || count, 2);
+    const t = Math.log(count + 1) / Math.log(maxCount + 1);
+    const [r, g, b] = clusterColor(t);
+    const rad = 15 + 11 * Math.sqrt(t);
+    const d = rad * 2;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${{d}}' height='${{d}}'><circle cx='${{rad}}' cy='${{rad}}' r='${{rad - 1.5}}' fill='rgba(${{r}},${{g}},${{b}},0.5)' stroke='rgba(${{r}},${{g}},${{b}},0.85)' stroke-width='1.5'/></svg>`;
+    return new google.maps.Marker({{
+      position,
+      icon: {{
+        url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+        scaledSize: new google.maps.Size(d, d),
+        anchor: new google.maps.Point(rad, rad),
+      }},
+      label: {{ text: String(count), color: "{ACCENT_HEX}", fontSize: "12px", fontWeight: "700" }},
+      zIndex: 500 + count,
+    }});
+  }}
 }}
 
 let gmap = null;
@@ -962,7 +997,11 @@ function renderMap(rows) {{
   }});
 
   if (window.markerClusterer) {{
-    clusterer = new window.markerClusterer.MarkerClusterer({{ map: gmap, markers: mapMarkers }});
+    clusterer = new window.markerClusterer.MarkerClusterer({{
+      map: gmap,
+      markers: mapMarkers,
+      renderer: new PaletteClusterRenderer(),
+    }});
   }} else {{
     mapMarkers.forEach((m) => m.setMap(gmap));
   }}
