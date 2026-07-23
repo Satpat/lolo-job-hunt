@@ -67,7 +67,7 @@ GROUP_ORDER_JSON = json.dumps(GROUP_ORDER)
 SUBURBS_JSON = json.dumps(suburbs)
 
 TOTAL = len(slim)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1JAi7UHCDviC9cZnl1ftBq-3wV56RZgrl/edit"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1E2w-MA5pfL-udws7pqbvqN6rxHSjilcvV4nRia2WlLQ/edit?usp=sharing"
 
 HTML = f"""<meta charset="utf-8" />
 <title>Lolo Job Hunt</title>
