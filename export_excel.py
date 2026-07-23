@@ -11,6 +11,7 @@ Usage:
 import csv
 import json
 from pathlib import Path
+from urllib.parse import quote, urlparse
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -54,10 +55,47 @@ COLUMNS = [
     "Address",
     "Phone",
     "Website",
-    "Hours",
+    "Gmap link",
     "Applied?",
     "Notes",
 ]
+
+SOCIAL_LABELS = {
+    "instagram.com": "Instagram",
+    "facebook.com": "Facebook",
+    "fb.com": "Facebook",
+    "fb.me": "Facebook",
+    "tiktok.com": "TikTok",
+    "twitter.com": "Twitter",
+    "x.com": "Twitter",
+    "linkedin.com": "LinkedIn",
+    "youtube.com": "YouTube",
+    "youtu.be": "YouTube",
+    "pinterest.com": "Pinterest",
+    "snapchat.com": "Snapchat",
+    "wa.me": "WhatsApp",
+    "whatsapp.com": "WhatsApp",
+}
+
+
+def website_label(url: str, business_name: str) -> str:
+    """Business name for a regular site; platform name for a social link."""
+    if not url:
+        return ""
+    host = urlparse(url).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    for domain, label in SOCIAL_LABELS.items():
+        if host == domain or host.endswith("." + domain):
+            return label
+    return business_name
+
+
+def gmap_url(place_id: str, business_name: str) -> str:
+    """Link to the business's own Google Maps listing, not raw GPS coords."""
+    if not place_id:
+        return ""
+    return f"https://www.google.com/maps/search/?api=1&query={quote(business_name)}&query_place_id={place_id}"
 
 
 def load_data():
@@ -67,10 +105,10 @@ def load_data():
 
 
 def to_row(b: dict) -> list:
-    hours = "; ".join(b.get("opening_hours") or []) if b.get("opening_hours") else ""
     cat = b.get("category") or ""
+    name = b.get("name") or ""
     return [
-        b.get("name") or "",
+        name,
         GROUP_OF.get(cat, ""),
         CATEGORY_DISPLAY.get(cat, cat),
         b.get("suburb") or "",
@@ -78,7 +116,7 @@ def to_row(b: dict) -> list:
         b.get("address") or "",
         b.get("phone") or "",
         b.get("website") or "",
-        hours,
+        gmap_url(b.get("place_id"), name),
         "",  # Applied?
         "",  # Notes
     ]
@@ -90,6 +128,9 @@ def write_csv(rows):
         writer.writerow(COLUMNS)
         writer.writerows(rows)
     print(f"Wrote {CSV_OUT}")
+
+
+HYPERLINK_FONT = Font(color="0563C1", underline="single")
 
 
 def write_xlsx(rows):
@@ -105,10 +146,29 @@ def write_xlsx(rows):
         cell.fill = header_fill
         cell.font = header_font
 
+    website_col = COLUMNS.index("Website") + 1
+    gmap_col = COLUMNS.index("Gmap link") + 1
+
     for row in rows:
         ws.append(row)
+        r = ws.max_row
+        name = row[0]
 
-    widths = [28, 20, 18, 16, 12, 40, 16, 30, 45, 10, 30]
+        website_val = row[website_col - 1]
+        if website_val:
+            cell = ws.cell(row=r, column=website_col)
+            cell.value = website_label(website_val, name)
+            cell.hyperlink = website_val
+            cell.font = HYPERLINK_FONT
+
+        gmap_val = row[gmap_col - 1]
+        if gmap_val:
+            cell = ws.cell(row=r, column=gmap_col)
+            cell.value = "Directions"
+            cell.hyperlink = gmap_val
+            cell.font = HYPERLINK_FONT
+
+    widths = [28, 20, 18, 16, 12, 40, 16, 22, 12, 10, 30]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
