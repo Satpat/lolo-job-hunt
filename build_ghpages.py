@@ -1057,6 +1057,8 @@ function initMap() {{
     streetViewControl: false,
     fullscreenControl: false,
     mapTypeControl: false,
+    gestureHandling: "greedy",
+    clickableIcons: false,
   }});
   new google.maps.TransitLayer().setMap(gmap);
   renderTransitRoutes();
