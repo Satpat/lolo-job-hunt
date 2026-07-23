@@ -8,37 +8,42 @@ BASE = Path(__file__).parent
 DATA = json.loads((BASE / "data" / "businesses.json").read_text())
 
 GROUP_OF = {
-    "Cafe": "Food & Drink",
-    "Restaurant/Takeaway": "Food & Drink",
-    "Fast Food": "Food & Drink",
-    "Supermarket": "Supermarket & Grocery",
+    "Cafe": "Hospo",
+    "Restaurant/Takeaway": "Hospo",
+    "Fast Food": "Hospo",
+    "Supermarket": "Grocery",
     "Retail": "Retail",
     "Retail (general)": "Retail",
-    "Medical Clinic": "Health & Wellness",
-    "Hospital": "Health & Wellness",
-    "Dentist": "Health & Wellness",
-    "Allied Health": "Health & Wellness",
-    "Pharmacy": "Health & Wellness",
-    "Gym": "Fitness & Beauty",
-    "Salon/Beauty": "Fitness & Beauty",
-    "Childcare": "Family & Leisure",
-    "Cinema": "Family & Leisure",
+    "Medical Clinic": "Health",
+    "Hospital": "Health",
+    "Dentist": "Health",
+    "Allied Health": "Health",
+    "Pharmacy": "Health",
+    "Gym": "Fitness",
+    "Salon/Beauty": "Fitness",
+    "Childcare": "Family",
+    "Cinema": "Family",
 }
 
 GROUP_ORDER = [
-    "Food & Drink",
-    "Supermarket & Grocery",
+    "Hospo",
+    "Grocery",
     "Retail",
-    "Health & Wellness",
-    "Fitness & Beauty",
-    "Family & Leisure",
+    "Health",
+    "Fitness",
+    "Family",
 ]
+
+# Shorter, broader display labels for categories with slash-separated names.
+CATEGORY_DISPLAY = {
+    "Retail (general)": "Retail",
+    "Restaurant/Takeaway": "Restaurant",
+    "Salon/Beauty": "Beauty",
+}
 
 slim = []
 for d in DATA:
-    cat = d["category"]
-    if cat == "Retail (general)":
-        cat = "Retail"
+    cat = CATEGORY_DISPLAY.get(d["category"], d["category"])
     slim.append(
         {
             "id": d["place_id"],
@@ -206,11 +211,19 @@ select#sortSel {{
   font: inherit;
   font-size: 13.5px;
   font-family: var(--font-mono);
-  padding: 0 10px;
+  padding: 0 30px 0 10px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%237c5568' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}}
+:root[data-theme="dark"] select#sortSel {{
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%23c9a8bc' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }}
 
 .view-toggle {{
@@ -237,8 +250,10 @@ select#sortSel {{
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding-bottom: 2px;
   scrollbar-width: none;
+  padding-right: 16px;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
 }}
 .chip-row::-webkit-scrollbar {{ display: none; }}
 .chip {{
@@ -335,7 +350,7 @@ select#sortSel {{
   font-size: 11px;
   font-weight: 700;
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: 999px;
   letter-spacing: 0.01em;
 }}
 .tag.suburb {{
@@ -357,7 +372,7 @@ select#sortSel {{
   background: var(--surface-2);
   border: 1px solid var(--line-soft);
   padding: 3px 8px 3px 6px;
-  border-radius: 5px;
+  border-radius: 999px;
 }}
 .rating svg {{ width: 10px; height: 10px; color: #d6a032; flex: 0 0 auto; }}
 :root[data-theme="dark"] .rating svg {{ color: #e8bc63; }}
@@ -468,6 +483,14 @@ footer {{
   font-size: 11.5px;
   color: var(--ink-faint);
   line-height: 1.7;
+  text-align: center;
+}}
+footer .sig {{
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }}
 a {{ color: inherit; }}
 
@@ -610,10 +633,9 @@ a {{ color: inherit; }}
 </div>
 
 <footer>
-  Data pulled from Google Places API (New), {TOTAL:,} operational listings across Bundoora,
-  Reservoir, Preston, Thomastown, Epping, South Morang, Mill Park, Watsonia, Macleod
-  and Greensborough &mdash; suburbs with a direct tram, train or SmartBus link to Bundoora.
-  Distances are straight-line, not travel time. Built for Lolo's job hunt.
+  Data pulled from Google Places API.
+  <br />Built with love, for Lolo.
+  <br /><span class="sig">VeerLo&trade;</span>
 </footer>
 
 <script>
@@ -745,12 +767,12 @@ function filtered() {{
 function catColorVar(grp) {{
   return (
     {{
-      "Food & Drink": "food",
-      "Supermarket & Grocery": "grocery",
+      "Hospo": "food",
+      "Grocery": "grocery",
       Retail: "retail",
-      "Health & Wellness": "health",
-      "Fitness & Beauty": "fitness",
-      "Family & Leisure": "family",
+      "Health": "health",
+      "Fitness": "fitness",
+      "Family": "family",
     }}[grp] || "food"
   );
 }}
@@ -867,12 +889,12 @@ function fitViewBoxToData() {{
 }}
 
 const LEGEND = [
-  ["Food & Drink", "food"],
-  ["Supermarket & Grocery", "grocery"],
+  ["Hospo", "food"],
+  ["Grocery", "grocery"],
   ["Retail", "retail"],
-  ["Health & Wellness", "health"],
-  ["Fitness & Beauty", "fitness"],
-  ["Family & Leisure", "family"],
+  ["Health", "health"],
+  ["Fitness", "fitness"],
+  ["Family", "family"],
 ];
 function renderLegend() {{
   document.getElementById("mapLegend").innerHTML = LEGEND.map(

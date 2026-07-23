@@ -22,21 +22,27 @@ CSV_OUT = BASE / "data" / "businesses.csv"
 XLSX_OUT = BASE / "Bundoora_Business_Directory.xlsx"
 
 GROUP_OF = {
-    "Cafe": "Food & Drink",
-    "Restaurant/Takeaway": "Food & Drink",
-    "Fast Food": "Food & Drink",
-    "Supermarket": "Supermarket & Grocery",
+    "Cafe": "Hospo",
+    "Restaurant/Takeaway": "Hospo",
+    "Fast Food": "Hospo",
+    "Supermarket": "Grocery",
     "Retail": "Retail",
     "Retail (general)": "Retail",
-    "Medical Clinic": "Health & Wellness",
-    "Hospital": "Health & Wellness",
-    "Dentist": "Health & Wellness",
-    "Allied Health": "Health & Wellness",
-    "Pharmacy": "Health & Wellness",
-    "Gym": "Fitness & Beauty",
-    "Salon/Beauty": "Fitness & Beauty",
-    "Childcare": "Family & Leisure",
-    "Cinema": "Family & Leisure",
+    "Medical Clinic": "Health",
+    "Hospital": "Health",
+    "Dentist": "Health",
+    "Allied Health": "Health",
+    "Pharmacy": "Health",
+    "Gym": "Fitness",
+    "Salon/Beauty": "Fitness",
+    "Childcare": "Family",
+    "Cinema": "Family",
+}
+
+CATEGORY_DISPLAY = {
+    "Retail (general)": "Retail",
+    "Restaurant/Takeaway": "Restaurant",
+    "Salon/Beauty": "Beauty",
 }
 
 COLUMNS = [
@@ -66,7 +72,7 @@ def to_row(b: dict) -> list:
     return [
         b.get("name") or "",
         GROUP_OF.get(cat, ""),
-        "Retail" if cat == "Retail (general)" else cat,
+        CATEGORY_DISPLAY.get(cat, cat),
         b.get("suburb") or "",
         b.get("distance_km"),
         b.get("address") or "",
