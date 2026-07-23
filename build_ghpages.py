@@ -303,16 +303,29 @@ select#sortSel {{
 }}
 .sheet-btn:hover {{ opacity: 0.9; }}
 
+.chip-row-wrap {{ position: relative; }}
 .chip-row {{
   display: flex;
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
   padding-right: 16px;
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
 }}
 .chip-row::-webkit-scrollbar {{ display: none; }}
+/* Blurred fade at the scroll edge — a soft cutoff instead of a hard clip,
+   echoing the same backdrop-blur the sticky controls bar already uses */
+.chip-row-wrap::after {{
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--bg) 92%, transparent) 65%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+}}
 .chip {{
   flex: 0 0 auto;
   font-family: var(--font-mono);
@@ -765,8 +778,8 @@ a {{ color: inherit; }}
       <a class="sheet-btn" href="{SHEET_URL}" target="_blank" rel="noopener">Sheet</a>
       <button id="appliedOnlyBtn" class="chip" data-active="0">Applied only</button>
     </div>
-    <div class="chip-row" id="groupChips"></div>
-    <div class="chip-row" id="suburbChips"></div>
+    <div class="chip-row-wrap"><div class="chip-row" id="groupChips"></div></div>
+    <div class="chip-row-wrap"><div class="chip-row" id="suburbChips"></div></div>
   </div>
 </div>
 
