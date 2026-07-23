@@ -1048,7 +1048,7 @@ const TRANSIT_ROUTES = [
   {{
     name: "Tram 86",
     mode: "TRAM",
-    origin: "Bundoora RMIT tram terminus, VIC",
+    origin: "Plenty Rd & McKimmies Rd, Bundoora VIC",
     destination: "Waterfront City, Docklands VIC",
     color: "{ACCENT_HEX}",
     weight: 4,
