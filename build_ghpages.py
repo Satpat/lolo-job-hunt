@@ -68,7 +68,7 @@ CAT_HEX = {
     "family": "#7a1f3d",
 }
 ACCENT_HEX = "#8e2a52"
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1E2w-MA5pfL-udws7pqbvqN6rxHSjilcvV4nRia2WlLQ/edit?usp=sharing"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1OcQTgpYp7mQKCtV6wE6hOf2PEHbO_gUX7GXuAIghMl4/edit?usp=sharing"
 
 slim = []
 for d in DATA:
