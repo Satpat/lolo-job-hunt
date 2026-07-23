@@ -68,6 +68,7 @@ CAT_HEX = {
     "family": "#7a1f3d",
 }
 ACCENT_HEX = "#8e2a52"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1JAi7UHCDviC9cZnl1ftBq-3wV56RZgrl/edit"
 
 slim = []
 for d in DATA:
@@ -275,6 +276,23 @@ select#sortSel {{
 }}
 .view-btn + .view-btn {{ border-left: 1px solid var(--line); }}
 .view-btn[data-active="1"] {{ background: var(--accent); color: var(--accent-ink); }}
+
+.sheet-btn {{
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-dim);
+  text-decoration: none;
+  cursor: pointer;
+}}
+.sheet-btn:hover {{ border-color: var(--accent); color: var(--accent); }}
 
 .chip-row {{
   display: flex;
@@ -624,6 +642,7 @@ a {{ color: inherit; }}
         <button class="view-btn" data-view="list" data-active="1">List</button>
         <button class="view-btn" data-view="map" data-active="0">Map</button>
       </div>
+      <a class="sheet-btn" href="{SHEET_URL}" target="_blank" rel="noopener">Sheet</a>
     </div>
     <div class="chip-row" id="groupChips"></div>
     <div class="chip-row" id="suburbChips"></div>
