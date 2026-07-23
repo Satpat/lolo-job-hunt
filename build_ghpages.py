@@ -101,7 +101,14 @@ TOTAL = len(slim)
 HTML = f"""<!doctype html>
 <meta charset="utf-8" />
 <title>Lolo Job Hunt</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="{ACCENT_HEX}" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Lolo Job Hunt" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" href="icon-512.png" />
 <style>
 :root {{
   --bg: #faf3f8;
@@ -165,6 +172,8 @@ body {{
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }}
 @media (prefers-reduced-motion: reduce) {{
   * {{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }}
@@ -355,6 +364,7 @@ select#sortSel {{
 .card[data-applied="1"] {{ opacity: 0.5; }}
 .card-top {{ display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }}
 .card-name {{
+  flex: 1;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 16px;
@@ -611,6 +621,115 @@ a {{ color: inherit; }}
   font-size: 12.5px;
   margin-top: 10px;
 }}
+
+/* iPhone: inputs under 16px make Safari auto-zoom the page on focus */
+@media (max-width: 480px) {{
+  #search, #lockInput {{ font-size: 16px; }}
+}}
+
+/* Bigger tap target on the applied-check control (was 26px, under Apple's
+   44pt guidance for anything routinely tapped) */
+.applied-btn {{ width: 32px; height: 32px; }}
+.applied-btn svg {{ width: 15px; height: 15px; }}
+
+/* MacBook / wide desktop: use the extra width instead of leaving it as
+   dead gutters either side of a centered 1080px column */
+@media (min-width: 1400px) {{
+  .wrap, .controls-inner, header.top, footer {{ max-width: 1320px; }}
+  .grid {{ grid-template-columns: repeat(4, 1fr); }}
+}}
+
+/* Desktop-only hover affordances — gated on real pointers so a touch tap
+   doesn't leave a "stuck" hover state on iPhone */
+@media (hover: hover) and (pointer: fine) {{
+  .card {{ transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }}
+  .card:hover {{
+    border-color: var(--accent);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 10%, transparent);
+    transform: translateY(-1px);
+  }}
+  .chip:hover:not([data-active="1"]) {{ border-color: var(--accent); color: var(--accent); }}
+  #search:hover {{ border-color: var(--ink-faint); }}
+}}
+
+/* Select-for-export checkbox — square, not the round applied-status
+   control, so the two don't read as the same action */
+.select-box {{ position: relative; flex: 0 0 auto; width: 22px; height: 22px; margin-top: 2px; cursor: pointer; }}
+.select-box input {{ position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }}
+.select-mark {{
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}}
+.select-box input:checked + .select-mark {{ background: var(--accent); border-color: var(--accent); }}
+.select-box input:checked + .select-mark::after {{
+  content: "";
+  width: 9px;
+  height: 5px;
+  margin-top: -2px;
+  border-left: 2px solid var(--accent-ink);
+  border-bottom: 2px solid var(--accent-ink);
+  transform: rotate(-45deg);
+}}
+.select-box input:focus-visible + .select-mark {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
+.card[data-selected="1"] {{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }}
+
+/* Per-business note toggle + box */
+.btn.note-btn.has-note {{ border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }}
+.note-box {{
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  min-height: 56px;
+  resize: vertical;
+}}
+.note-box:focus {{ outline: none; border-color: var(--accent); }}
+
+/* Inline "clear filters" link injected into the count row once any
+   filter/search/toggle differs from the default state */
+.clear-btn {{
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0 0 0 6px;
+  cursor: pointer;
+  text-decoration: underline;
+}}
+
+/* Floating bulk-copy bar for the select-for-export checkboxes */
+.export-bar {{
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 8px 8px 16px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink) 18%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}}
+.export-bar .btn {{ padding: 6px 14px; }}
+.export-bar .btn svg {{ width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }}
 </style>
 
 <div class="lock-screen" id="lockScreen">
@@ -637,12 +756,14 @@ a {{ color: inherit; }}
         <option value="dist">Nearest first</option>
         <option value="name">A&ndash;Z</option>
         <option value="rating">Highest rated</option>
+        <option value="me">Near me now</option>
       </select>
       <div class="view-toggle">
         <button class="view-btn" data-view="list" data-active="1">List</button>
         <button class="view-btn" data-view="map" data-active="0">Map</button>
       </div>
       <a class="sheet-btn" href="{SHEET_URL}" target="_blank" rel="noopener">Sheet</a>
+      <button id="appliedOnlyBtn" class="chip" data-active="0">Applied only</button>
     </div>
     <div class="chip-row" id="groupChips"></div>
     <div class="chip-row" id="suburbChips"></div>
@@ -676,6 +797,12 @@ a {{ color: inherit; }}
       <p class="map-info-empty">tap a pin to see who they are &#128205;</p>
     </div>
   </div>
+</div>
+
+<div class="export-bar" id="exportBar" style="display:none">
+  <span id="exportCount"></span>
+  <button id="exportCopyBtn" class="btn primary">Copy</button>
+  <button id="exportClearBtn" class="btn">Clear</button>
 </div>
 
 <footer>
@@ -716,9 +843,22 @@ const CAT_HEX = {CAT_HEX_JSON};
 const ACCENT_HEX = "{ACCENT_HEX}";
 const REF = {{ lat: -37.7000101, lng: 145.0615908 }};
 
-const state = {{ q: "", group: "All", suburb: "All", sort: "dist", visible: 40, view: "list" }};
+const state = {{ q: "", group: "All", suburb: "All", sort: "dist", visible: 40, view: "list", appliedOnly: false }};
 const PAGE = 40;
 const applied = new Set(JSON.parse(localStorage.getItem("bundoora_applied") || "[]"));
+const selected = new Set();
+const notes = JSON.parse(localStorage.getItem("bundoora_notes") || "{{}}");
+function saveNotes() {{
+  localStorage.setItem("bundoora_notes", JSON.stringify(notes));
+}}
+let myPos = null;
+function haversine(p, d) {{
+  const R = 6371;
+  const dLat = ((d.lat - p.lat) * Math.PI) / 180;
+  const dLng = ((d.lng - p.lng) * Math.PI) / 180;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos((p.lat * Math.PI) / 180) * Math.cos((d.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}}
 
 const CHEER_LINES = [
   "tap a card &rarr; call or get directions",
@@ -802,6 +942,7 @@ function filtered() {{
   let rows = DATA;
   if (state.group !== "All") rows = rows.filter((d) => d.grp === state.group);
   if (state.suburb !== "All") rows = rows.filter((d) => d.suburb === state.suburb);
+  if (state.appliedOnly) rows = rows.filter((d) => applied.has(d.id));
   if (state.q) {{
     const q = state.q.toLowerCase();
     rows = rows.filter((d) => d.name.toLowerCase().includes(q));
@@ -810,7 +951,33 @@ function filtered() {{
   if (state.sort === "dist") rows.sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9));
   else if (state.sort === "name") rows.sort((a, b) => a.name.localeCompare(b.name));
   else if (state.sort === "rating") rows.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  else if (state.sort === "me" && myPos) {{
+    rows.forEach((d) => {{ d._liveDist = haversine(myPos, d); }});
+    rows.sort((a, b) => a._liveDist - b._liveDist);
+  }}
   return rows;
+}}
+
+function hasActiveFilters() {{
+  return state.group !== "All" || state.suburb !== "All" || !!state.q || state.appliedOnly;
+}}
+function clearFiltersBtnHtml() {{
+  return hasActiveFilters() ? ` <button id="clearFiltersBtn" class="clear-btn">clear filters</button>` : "";
+}}
+function wireClearFilters() {{
+  const btn = document.getElementById("clearFiltersBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {{
+    state.group = "All";
+    state.suburb = "All";
+    state.q = "";
+    state.appliedOnly = false;
+    state.visible = PAGE;
+    document.getElementById("search").value = "";
+    document.getElementById("appliedOnlyBtn").dataset.active = "0";
+    renderChips();
+    render();
+  }});
 }}
 
 function catColorVar(grp) {{
@@ -837,6 +1004,8 @@ const CHECK_SVG =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>';
 const STAR_SVG =
   '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.6l2.47 5.24 5.63.78-4.08 4.06.99 5.72L10 14.5l-5.01 2.9.99-5.72L1.9 7.62l5.63-.78L10 1.6z"/></svg>';
+const CLIPBOARD_SVG =
+  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="14" rx="1.5"/><path d="M8 4V3a1 1 0 011-1h2a1 1 0 011 1v1"/><path d="M8 10h4M8 13h4"/></svg>';
 function ratingChip(rating) {{
   if (!rating) return "";
   return `<span class="rating">${{STAR_SVG}}${{rating}}</span>`;
@@ -845,13 +1014,20 @@ function ratingChip(rating) {{
 function card(d) {{
   const k = catColorVar(d.grp);
   const isApplied = applied.has(d.id);
+  const isSelected = selected.has(d.id);
+  const hasNote = !!notes[d.id];
+  const dist = d._liveDist != null ? d._liveDist : d.dist;
   const phoneHtml = d.phone
     ? `<a class="btn primary" href="tel:${{d.phone.replace(/[^+\\d]/g, "")}}">Call ${{d.phone}}</a>`
     : `<span class="btn disabled">No phone listed</span>`;
   const siteHtml = d.site ? `<a class="btn" href="${{d.site}}" target="_blank" rel="noopener">Website</a>` : "";
   return `
-  <div class="card" data-applied="${{isApplied ? 1 : 0}}">
+  <div class="card" data-applied="${{isApplied ? 1 : 0}}" data-selected="${{isSelected ? 1 : 0}}">
     <div class="card-top">
+      <label class="select-box" title="Select for export">
+        <input type="checkbox" class="select-cb" data-id="${{d.id}}" ${{isSelected ? "checked" : ""}} />
+        <span class="select-mark"></span>
+      </label>
       <div class="card-name">${{d.name}}</div>
       <button class="applied-btn" data-id="${{d.id}}" aria-pressed="${{isApplied}}" aria-label="Mark as applied" title="Mark as applied">${{CHECK_SVG}}</button>
     </div>
@@ -859,14 +1035,16 @@ function card(d) {{
       <span class="tag" style="background:var(--cat-${{k}}-bg);color:var(--cat-${{k}})">${{d.cat}}</span>
       <span class="tag suburb">${{d.suburb}}</span>
       ${{ratingChip(d.rating)}}
-      <span class="dist-badge">${{d.dist != null ? d.dist.toFixed(1) + " km" : ""}}</span>
+      <span class="dist-badge">${{dist != null ? dist.toFixed(1) + " km" : ""}}</span>
     </div>
     <div class="addr">${{d.addr}}</div>
     <div class="action-row">
       ${{phoneHtml}}
       <a class="btn" href="${{mapsUrl(d)}}" target="_blank" rel="noopener">Directions</a>
       ${{siteHtml}}
+      <button class="btn note-btn ${{hasNote ? "has-note" : ""}}" data-id="${{d.id}}">${{hasNote ? "Note &#9998;" : "Add note"}}</button>
     </div>
+    <textarea class="note-box" data-id="${{d.id}}" placeholder="e.g. asked for manager, follow up Tues" style="display:${{hasNote ? "block" : "none"}}">${{notes[d.id] || ""}}</textarea>
   </div>`;
 }}
 
@@ -882,7 +1060,8 @@ function render() {{
   document.getElementById("emptyState").style.display = rows.length ? "none" : "block";
   document.getElementById("appliedLabel").innerHTML = encouragementFor(applied.size);
   if (state.view === "map") {{
-    document.getElementById("countLabel").textContent = `${{rows.length}} pinned`;
+    document.getElementById("countLabel").innerHTML = `${{rows.length}} pinned${{clearFiltersBtnHtml()}}`;
+    wireClearFilters();
     renderMap(rows);
   }} else {{
     renderList(rows);
@@ -893,7 +1072,8 @@ function renderList(rows) {{
   const grid = document.getElementById("grid");
   const slice = rows.slice(0, state.visible);
   grid.innerHTML = slice.map(card).join("");
-  document.getElementById("countLabel").textContent = `showing ${{slice.length}} of ${{rows.length}}`;
+  document.getElementById("countLabel").innerHTML = `showing ${{slice.length}} of ${{rows.length}}${{clearFiltersBtnHtml()}}`;
+  wireClearFilters();
   document.getElementById("loadMoreRow").style.display = rows.length > slice.length ? "flex" : "none";
 
   grid.querySelectorAll(".applied-btn").forEach((btn) =>
@@ -903,6 +1083,37 @@ function renderList(rows) {{
       setApplied(id, nowApplied);
       btn.setAttribute("aria-pressed", String(nowApplied));
       btn.closest(".card").dataset.applied = nowApplied ? "1" : "0";
+    }})
+  );
+
+  grid.querySelectorAll(".select-cb").forEach((cb) =>
+    cb.addEventListener("change", () => {{
+      const id = cb.dataset.id;
+      if (cb.checked) selected.add(id);
+      else selected.delete(id);
+      cb.closest(".card").dataset.selected = cb.checked ? "1" : "0";
+      updateExportBar();
+    }})
+  );
+
+  grid.querySelectorAll(".note-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {{
+      const box = btn.closest(".card").querySelector(".note-box");
+      const isOpen = box.style.display !== "none";
+      box.style.display = isOpen ? "none" : "block";
+      if (!isOpen) box.focus();
+    }})
+  );
+
+  grid.querySelectorAll(".note-box").forEach((box) =>
+    box.addEventListener("input", () => {{
+      const id = box.dataset.id;
+      if (box.value.trim()) notes[id] = box.value;
+      else delete notes[id];
+      saveNotes();
+      const btn = box.closest(".card").querySelector(".note-btn");
+      btn.textContent = notes[id] ? "Note \\u270e" : "Add note";
+      btn.classList.toggle("has-note", !!notes[id]);
     }})
   );
 }}
@@ -941,6 +1152,7 @@ function mapInfoHtml(d) {{
     : `<span class="btn disabled">No phone listed</span>`;
   const siteHtml = d.site ? `<a class="btn" href="${{d.site}}" target="_blank" rel="noopener">Website</a>` : "";
   const k = catColorVar(d.grp);
+  const dist = d._liveDist != null ? d._liveDist : d.dist;
   return `
     <div class="card-top">
       <div class="card-name">${{d.name}}</div>
@@ -950,7 +1162,7 @@ function mapInfoHtml(d) {{
       <span class="tag" style="background:var(--cat-${{k}}-bg);color:var(--cat-${{k}})">${{d.cat}}</span>
       <span class="tag suburb">${{d.suburb}}</span>
       ${{ratingChip(d.rating)}}
-      <span class="dist-badge">${{d.dist != null ? d.dist.toFixed(1) + " km" : ""}}</span>
+      <span class="dist-badge">${{dist != null ? dist.toFixed(1) + " km" : ""}}</span>
     </div>
     <div class="addr">${{d.addr}}</div>
     <div class="action-row">
@@ -1223,13 +1435,104 @@ document.getElementById("search").addEventListener("input", (e) => {{
   render();
 }});
 document.getElementById("sortSel").addEventListener("change", (e) => {{
-  state.sort = e.target.value;
+  const val = e.target.value;
+  if (val === "me") {{
+    const prevSort = state.sort;
+    if (!navigator.geolocation) {{
+      alert("Location isn't available in this browser.");
+      e.target.value = prevSort;
+      return;
+    }}
+    document.getElementById("cheerLine").textContent = "finding you\\u2026";
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {{
+        myPos = {{ lat: pos.coords.latitude, lng: pos.coords.longitude }};
+        state.sort = "me";
+        pickCheer();
+        render();
+      }},
+      () => {{
+        alert("Couldn't get your location \\u2014 check location permissions for this site and try again.");
+        e.target.value = prevSort;
+      }},
+      {{ timeout: 8000, maximumAge: 60000 }}
+    );
+    return;
+  }}
+  state.sort = val;
+  render();
+}});
+document.getElementById("appliedOnlyBtn").addEventListener("click", (e) => {{
+  state.appliedOnly = !state.appliedOnly;
+  e.currentTarget.dataset.active = state.appliedOnly ? "1" : "0";
+  state.visible = PAGE;
   render();
 }});
 document.getElementById("loadMoreBtn").addEventListener("click", () => {{
   state.visible += PAGE;
   render();
 }});
+
+/* Select-a-few-and-copy: builds a plain-text summary of the checked cards
+   (name/category/address/phone/site/note) onto the clipboard, for pasting
+   into Notes or a message. */
+function exportText() {{
+  return DATA.filter((d) => selected.has(d.id))
+    .map((d) => {{
+      const lines = [`${{d.name}} \\u2014 ${{d.cat}}, ${{d.suburb}}`, d.addr];
+      if (d.phone) lines.push(d.phone);
+      if (d.site) lines.push(d.site);
+      if (notes[d.id]) lines.push(`Note: ${{notes[d.id]}}`);
+      return lines.join("\\n");
+    }})
+    .join("\\n\\n");
+}}
+function updateExportBar() {{
+  const bar = document.getElementById("exportBar");
+  const n = selected.size;
+  bar.style.display = n ? "flex" : "none";
+  document.getElementById("exportCount").textContent = `${{n}} selected`;
+}}
+document.getElementById("exportCopyBtn").addEventListener("click", async (e) => {{
+  const btn = e.currentTarget;
+  try {{
+    await navigator.clipboard.writeText(exportText());
+    btn.textContent = "Copied \\u2713";
+  }} catch (err) {{
+    btn.textContent = "Couldn't copy";
+  }}
+  setTimeout(() => {{
+    btn.innerHTML = `${{CLIPBOARD_SVG}} Copy`;
+  }}, 1500);
+}});
+document.getElementById("exportClearBtn").addEventListener("click", () => {{
+  selected.clear();
+  updateExportBar();
+  render();
+}});
+
+/* MacBook: "/" jumps to search like GitHub's search shortcut, Escape drops
+   focus back out. Skipped while already typing so it doesn't eat a literal "/". */
+document.addEventListener("keydown", (e) => {{
+  const tag = (e.target.tagName || "").toLowerCase();
+  const typing = tag === "input" || tag === "select" || tag === "textarea";
+  const search = document.getElementById("search");
+  if (e.key === "/" && !typing) {{
+    e.preventDefault();
+    search.focus();
+  }} else if (e.key === "Escape" && document.activeElement === search) {{
+    search.blur();
+  }}
+}});
+
+document.getElementById("exportCopyBtn").innerHTML = `${{CLIPBOARD_SVG}} Copy`;
+updateExportBar();
+
+if ("serviceWorker" in navigator) {{
+  window.addEventListener("load", () => {{
+    navigator.serviceWorker.register("sw.js").catch(() => {{}});
+  }});
+}}
 
 pickCheer();
 renderChips();
@@ -1242,3 +1545,20 @@ render();
 out = BASE / "index.html"
 out.write_text(HTML, encoding="utf-8")
 print(f"Wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
+
+MANIFEST = {
+    "name": "Lolo Job Hunt",
+    "short_name": "Job Hunt",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#faf3f8",
+    "theme_color": ACCENT_HEX,
+    "icons": [
+        {"src": "icon-180.png", "sizes": "180x180", "type": "image/png"},
+        {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    ],
+}
+manifest_out = BASE / "manifest.json"
+manifest_out.write_text(json.dumps(MANIFEST, indent=2) + "\n", encoding="utf-8")
+print(f"Wrote {manifest_out}")

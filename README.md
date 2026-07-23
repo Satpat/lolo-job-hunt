@@ -48,6 +48,14 @@ python3 export_excel.py       # writes data/businesses.csv and Bundoora_Business
 - `index.html` — the GitHub Pages version, with a real Google Maps JS SDK map
   (street basemap + live TransitLayer for tram/train/bus routes, marker
   clustering, home icon at 566 Grimshaw St)
+- `manifest.json` / `sw.js` / `icon-180.png` / `icon-512.png` — Home Screen
+  install support: Add to Home Screen on iOS gets a burgundy heart icon and
+  opens without Safari's address bar; `sw.js` caches `index.html` so the List
+  view (search/filter/notes/applied) still works with no signal, since all
+  business data is inlined in the page. The Map tab still needs a connection.
+  Regenerate the icons with `python3 generate_icons.py` (needs `pillow`) only
+  if the accent color ever changes — `manifest.json` is rewritten by
+  `build_ghpages.py` on every run.
 
 ## 4. Get a Google Maps JavaScript API key (for index.html only)
 
