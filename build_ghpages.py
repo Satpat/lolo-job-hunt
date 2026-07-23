@@ -607,13 +607,7 @@ a {{ color: inherit; }}
 </div>
 
 <header class="top">
-  <p class="eyebrow">Lolo Job Hunt &middot; near RMIT Bundoora</p>
   <h1>Go get 'em, Lolo &#128156;</h1>
-  <p class="sub">
-    <b>{TOTAL:,} places</b> within a tram, train or bus ride of RMIT Bundoora that actually
-    hire casual and part-time staff &mdash; sorted nearest-first from
-    <b>566 Grimshaw Street, Bundoora</b>. Every application is one step closer.
-  </p>
   <p class="meta-line" id="cheerLine">tap a card &rarr; call or get directions</p>
 </header>
 
