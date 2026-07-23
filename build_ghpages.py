@@ -922,20 +922,30 @@ function clusterColor(t) {{
   const [c0, c1, tt] = seg;
   return [Math.round(lerp(c0[0], c1[0], tt)), Math.round(lerp(c0[1], c1[1], tt)), Math.round(lerp(c0[2], c1[2], tt))];
 }}
+let clusterGradId = 0;
 class PaletteClusterRenderer {{
   render({{ count, position }}, stats) {{
     const maxCount = Math.max(stats.clusters.markers.max || count, 2);
     const t = Math.log(count + 1) / Math.log(maxCount + 1);
     const [r, g, b] = clusterColor(t);
     const rad = 15 + 11 * Math.sqrt(t);
-    const d = rad * 2;
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${{d}}' height='${{d}}'><circle cx='${{rad}}' cy='${{rad}}' r='${{rad - 1.5}}' fill='rgba(${{r}},${{g}},${{b}},0.5)' stroke='rgba(${{r}},${{g}},${{b}},0.85)' stroke-width='1.5'/></svg>`;
+    const canvasR = rad * 1.7;
+    const d = canvasR * 2;
+    const gid = `cg${{clusterGradId++}}`;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${{d}}' height='${{d}}'>
+      <defs><radialGradient id='${{gid}}' cx='50%' cy='50%' r='50%'>
+        <stop offset='0%' stop-color='rgba(${{r}},${{g}},${{b}},0.8)'/>
+        <stop offset='55%' stop-color='rgba(${{r}},${{g}},${{b}},0.5)'/>
+        <stop offset='100%' stop-color='rgba(${{r}},${{g}},${{b}},0)'/>
+      </radialGradient></defs>
+      <circle cx='${{canvasR}}' cy='${{canvasR}}' r='${{canvasR}}' fill='url(#${{gid}})'/>
+    </svg>`;
     return new google.maps.Marker({{
       position,
       icon: {{
         url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
         scaledSize: new google.maps.Size(d, d),
-        anchor: new google.maps.Point(rad, rad),
+        anchor: new google.maps.Point(canvasR, canvasR),
       }},
       label: {{ text: String(count), color: "{ACCENT_HEX}", fontSize: "12px", fontWeight: "700" }},
       zIndex: 500 + count,
