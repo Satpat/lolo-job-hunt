@@ -315,6 +315,7 @@ select#sortSel {{
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--ink-dim);
+  text-decoration: none;
   cursor: pointer;
 }}
 .toggle-btn[data-active="1"] {{ background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }}

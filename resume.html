@@ -89,6 +89,12 @@ h1 {
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
 }
 .chip-row::-webkit-scrollbar { display: none; }
+.chip-label {
+  display: flex; align-items: center; flex: 0 0 auto;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint);
+  padding-right: 2px;
+}
 
 .sheet-btn, .toggle-btn {
   font-family: var(--font-mono);
@@ -413,7 +419,7 @@ footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
 </style>
 
 <header class="top">
-  <h1>Your resume, Lolo &#128156;</h1>
+  <h1>Build your resume</h1>
   <p class="meta-line" id="cheerLine">fill it in on the left &rarr; it updates on the right</p>
 </header>
 
@@ -435,10 +441,8 @@ footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
     </div>
     <div class="chip-row-wrap">
       <div class="chip-row">
-        <select class="mini" id="tailorSel" title="Tailor for a business" style="max-width:52vw">
-          <option value="">Tailor for a business&hellip;</option>
-        </select>
-        <select class="mini" id="templateSel" title="Template">
+        <span class="chip-label">Style</span>
+        <select class="mini" id="templateSel" title="Template — page layout">
 <option value="kakuna">Centered</option>
 <option value="onyx">Left</option>
 <option value="compact">Compact</option>
@@ -1519,22 +1523,9 @@ document.getElementById("baselineBtn").addEventListener("click", async () => {
    Tailoring UI
    ══════════════════════════════════════════════════════════════════════ */
 
-function populateTailorSelect() {
-  const sel = document.getElementById("tailorSel");
-  const byGrp = {};
-  for (const b of BUSINESSES) (byGrp[b.grp] = byGrp[b.grp] || []).push(b);
-  for (const grp of Object.keys(byGrp).sort()) {
-    const og = document.createElement("optgroup");
-    og.label = grp;
-    for (const b of byGrp[grp].sort((a, z) => a.name.localeCompare(z.name))) {
-      const o = document.createElement("option");
-      o.value = b.id;
-      o.textContent = b.name + (b.suburb ? " · " + b.suburb : "");
-      og.appendChild(o);
-    }
-    sel.appendChild(og);
-  }
-}
+/* Tailoring is started from the jobs directory (each card's "Tailor résumé"
+   button deep-links here as resume.html?biz=<id>) and re-opened via "Saved" —
+   there is no business picker in this toolbar on purpose. */
 function bizById(id) { return BUSINESSES.find((b) => b.id === id) || null; }
 
 function setModeToggle() {
@@ -1545,13 +1536,11 @@ function setModeToggle() {
 }
 function clearTailor() {
   activeTailor = null; mode = "resume";
-  const sel = document.getElementById("tailorSel"); if (sel) sel.value = "";
   setModeToggle();
 }
 function activateTailor(id, entry) {
   const biz = (entry && entry.business) || bizById(id);
   activeTailor = { businessId: id, name: (biz && biz.name) || "Business", business: biz, fields: entry.fields };
-  document.getElementById("tailorSel").value = id;
   setModeToggle();
   showNotice("Tailored for " + activeTailor.name + ".", "Clear", () => { clearTailor(); renderForm(); renderPreview(); });
   renderForm(); renderPreview();
@@ -1562,7 +1551,6 @@ async function tailorFor(id) {
   if (!biz) return;
   if (!WORKER_URL) {
     showNotice("Tailoring isn't set up yet — the AI helper still needs deploying.");
-    document.getElementById("tailorSel").value = activeTailor ? activeTailor.businessId : "";
     return;
   }
   // Re-open a saved version instead of spending another call.
@@ -1570,7 +1558,6 @@ async function tailorFor(id) {
   if (saved && saved.fields) { activateTailor(id, saved); return; }
 
   showNotice("Tailoring your resume for " + biz.name + "…", null, null, null, true);
-  document.getElementById("tailorSel").disabled = true;
   try {
     const res = await fetch(WORKER_URL, {
       method: "POST",
@@ -1587,17 +1574,8 @@ async function tailorFor(id) {
     renderForm(); renderPreview();
   } catch (e) {
     showNotice("Couldn't tailor just now (" + String(e.message || e).slice(0, 60) + "). Your resume is unchanged.");
-    document.getElementById("tailorSel").value = activeTailor ? activeTailor.businessId : "";
-  } finally {
-    document.getElementById("tailorSel").disabled = false;
   }
 }
-
-document.getElementById("tailorSel").addEventListener("change", (e) => {
-  const id = e.target.value;
-  if (!id) { clearTailor(); renderForm(); renderPreview(); return; }
-  tailorFor(id);
-});
 
 /* Saved tailored versions */
 document.getElementById("savedBtn").addEventListener("click", () => {
@@ -1678,7 +1656,6 @@ function syncControls() {
    ══════════════════════════════════════════════════════════════════════ */
 
 document.body.dataset.pane = "edit";
-populateTailorSelect();
 if (window.ResizeObserver) new ResizeObserver(() => fitPaper()).observe(document.getElementById("paperFrame"));
 window.addEventListener("resize", fitPaper);
 
@@ -1699,7 +1676,6 @@ function handleBizParam() {
   if (!biz) return;
   const saved = loadTailors()[id];
   if (saved && saved.fields) { activateTailor(id, saved); return; }
-  document.getElementById("tailorSel").value = id;
   showNotice("Tailor this resume for " + biz.name + "?", "Tailor now", () => { hideNotice(); tailorFor(id); });
 }
 syncBaseline(hadLocal).then(handleBizParam, handleBizParam);
