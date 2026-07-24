@@ -131,7 +131,9 @@ experience/skills/bullets, and a cover letter. The page applies this as a
   and rewrite the two summary lines; it throws away anything (an employer, a skill)
   that isn't already in her resume. It literally cannot invent facts.
 - Lives **outside** the website repo because it deploys to Cloudflare, not to
-  GitHub Pages.
+  GitHub Pages. It has **its own private repo**,
+  [`Satpat/rr-tailor-worker`](https://github.com/Satpat/rr-tailor-worker) — so
+  changing it means two pushes in two places, and a Cloudflare deploy on top.
 
 ---
 
@@ -240,11 +242,19 @@ Node 22 (via nvm), which sits alongside your default Node 20.
 cd /Users/satyaveer/projects/lolo/rr-tailor-worker
 nvm use 22
 npm run deploy
+git add -A && git commit -m "update tailoring prompt" && git push
 ```
+
+Deploying and committing are **two different things** here: `npm run deploy` is
+what actually changes live behaviour, and the `git push` goes to the Worker's own
+private repo (`Satpat/rr-tailor-worker`), *not* the site repo. Doing only the push
+changes nothing for Lolo; doing only the deploy leaves the change unbacked-up.
 
 The URL (`https://rr-tailor.veerlo.workers.dev`) doesn't change, so **no site
 rebuild is needed** for a Worker-only change. To change the OpenAI key:
-`npm run secret`. See [../rr-tailor-worker/README.md](../rr-tailor-worker/README.md).
+`npm run secret` — it goes straight to Cloudflare and is never written to disk,
+which is why `.dev.vars` is gitignored and only `.dev.vars.example` is committed.
+See [../rr-tailor-worker/README.md](../rr-tailor-worker/README.md).
 
 ### The mental model
 
@@ -264,8 +274,10 @@ flowchart LR
 
 These sit next to `bundoora-directory/` but aren't part of the live site:
 
-- **`rr-tailor-worker/`** — the AI Worker (live, deploys to Cloudflare). Keep it;
-  it's the only copy.
+- **`rr-tailor-worker/`** — the AI Worker (live, deploys to Cloudflare). Backed up
+  since 2026-07-24 to its own private repo,
+  [`Satpat/rr-tailor-worker`](https://github.com/Satpat/rr-tailor-worker); before
+  that the local folder was the only copy.
 - **`reactive-resume/`** — a clone of the open-source resume app, kept only as a
   **reference** (the resume schema and the tailoring idea came from it).
 - **`rr-selfhost/`** — a **shelved** experiment to self-host the full Reactive
