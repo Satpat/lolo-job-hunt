@@ -195,6 +195,9 @@ select.mini {
   line-height: 1.45;
 }
 .notice span { flex: 1 1 160px; min-width: 0; }
+/* A class-level `display` beats the UA stylesheet's `[hidden] { display: none }`,
+   so without this the bar renders as an empty box whenever it is hidden. */
+.notice[hidden] { display: none; }
 
 .sec {
   border: 1px solid var(--line);
