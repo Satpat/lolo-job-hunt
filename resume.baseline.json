@@ -1,0 +1,134 @@
+{
+  "_comment": "Baseline resume for the Lolo Job Hunt resume builder. resume.html fetches this on first load, and offers to reload it whenever this file changes. Edits Lolo makes in the browser live in localStorage and are never overwritten without her say-so. Shape follows the Reactive Resume schema (MIT).",
+  "basics": {
+    "name": "Baivaba Panigrahi",
+    "headline": "Master of Laboratory Medicine · Customer service & healthcare professional",
+    "email": "baiv5500@gmail.com",
+    "phone": "0432 248 092",
+    "location": "Bundoora VIC",
+    "website": { "url": "", "label": "" }
+  },
+  "summary": {
+    "title": "Summary",
+    "hidden": false,
+    "content": "Friendly, reliable and highly adaptable medical graduate relocating to Melbourne to commence a Master of Laboratory Medicine at RMIT University. Experienced in fast-paced healthcare environments requiring exceptional communication, teamwork, customer service, problem solving and attention to detail. Seeking part-time employment in retail, customer service, administration, hospitality or university support roles while pursuing postgraduate studies."
+  },
+  "sections": {
+    "education": {
+      "title": "Education",
+      "hidden": false,
+      "items": [
+        {
+          "school": "RMIT University, Melbourne",
+          "degree": "Master of Laboratory Medicine",
+          "area": "",
+          "period": "Commencing July 2026",
+          "description": ""
+        },
+        {
+          "school": "GITAM Institute of Medical Sciences and Research",
+          "degree": "Bachelor of Medicine and Bachelor of Surgery (MBBS)",
+          "area": "",
+          "period": "2025",
+          "description": "Gold Medallist in Forensic Medicine\nDistinctions in Pathology, ENT and Forensic Medicine"
+        }
+      ]
+    },
+    "experience": {
+      "title": "Employment experience",
+      "hidden": false,
+      "items": [
+        {
+          "position": "Junior Resident — Cardiology",
+          "company": "IMS & SUM Hospital",
+          "location": "",
+          "period": "Nov 2025 – Present",
+          "description": "Delivered professional support to patients and families in a high-pressure environment\nCoordinated effectively with doctors, nurses and administrative staff\nManaged competing priorities while maintaining accuracy and professionalism"
+        },
+        {
+          "position": "Junior Resident & Registered Medical Officer — Clinical Haematology",
+          "company": "",
+          "location": "",
+          "period": "May 2025 – Nov 2025",
+          "description": "Assisted patients with enquiries and care coordination\nDemonstrated strong organisation, communication and teamwork skills\nWorked efficiently under pressure while maintaining service quality"
+        },
+        {
+          "position": "Medical Intern",
+          "company": "",
+          "location": "",
+          "period": "Mar 2024 – Apr 2025",
+          "description": "Worked with people from diverse backgrounds\nParticipated in community outreach and health camps\nDeveloped strong interpersonal and customer-facing communication skills"
+        }
+      ]
+    },
+    "skills": {
+      "title": "Key skills",
+      "hidden": false,
+      "items": [
+        {
+          "name": "Customer service",
+          "keywords": "Client support, professional communication, conflict resolution"
+        },
+        {
+          "name": "Working with people",
+          "keywords": "Teamwork and collaboration, adaptability and reliability, working under pressure"
+        },
+        {
+          "name": "Organisation",
+          "keywords": "Time management, problem solving, data entry and record management"
+        },
+        {
+          "name": "Software",
+          "keywords": "Microsoft Word, Excel and Outlook"
+        }
+      ]
+    },
+    "certifications": {
+      "title": "Certifications",
+      "hidden": false,
+      "items": [
+        {
+          "title": "Basic Life Support",
+          "issuer": "American Heart Association",
+          "date": "Valid until January 2027"
+        },
+        {
+          "title": "Medical Ethics Certificate",
+          "issuer": "",
+          "date": ""
+        }
+      ]
+    },
+    "languages": {
+      "title": "Languages",
+      "hidden": false,
+      "items": [
+        { "language": "English", "fluency": "Fluent" },
+        { "language": "Hindi", "fluency": "Fluent" },
+        { "language": "Odia", "fluency": "Fluent" },
+        { "language": "Telugu", "fluency": "Conversational" }
+      ]
+    },
+    "availability": {
+      "title": "Availability",
+      "hidden": false,
+      "content": "Available for weekday, evening, weekend and public holiday shifts\nEligible to work under Australian Student Visa conditions\nReferees available on request"
+    },
+    "projects": { "title": "Projects", "hidden": false, "items": [] }
+  },
+  "order": [
+    "summary",
+    "education",
+    "experience",
+    "skills",
+    "certifications",
+    "languages",
+    "availability",
+    "projects"
+  ],
+  "metadata": {
+    "template": "kakuna",
+    "typography": { "body": { "fontFamily": "arial" } },
+    "design": { "colors": { "primary": "#16181d" } }
+  }
+}

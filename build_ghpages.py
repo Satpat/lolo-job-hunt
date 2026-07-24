@@ -765,6 +765,7 @@ a {{ color: inherit; }}
         <button class="view-btn" data-view="map" data-active="0">Map</button>
       </div>
       <a class="sheet-btn" href="{SHEET_URL}" target="_blank" rel="noopener">Sheet</a>
+      <a class="toggle-btn" href="resume.html">Resume</a>
       <button id="viewedOnlyBtn" class="toggle-btn" data-active="0">Already viewed</button>
     </div>
     <div class="chip-row-wrap"><div class="chip-row" id="groupChips"></div></div>

@@ -48,6 +48,9 @@ python3 export_excel.py       # writes data/businesses.csv and Bundoora_Business
 - `index.html` — the GitHub Pages version, with a real Google Maps JS SDK map
   (street basemap + live TransitLayer for tram/train/bus routes, marker
   clustering, home icon at 566 Grimshaw St)
+- `resume.html` — the resume builder (see below), linked from the Resume
+  button in the header
+- `resume.baseline.json` — Lolo's starting resume, fetched by `resume.html`
 - `manifest.json` / `sw.js` / `icon-180.png` / `icon-512.png` — Home Screen
   install support: Add to Home Screen on iOS gets a burgundy heart icon and
   opens without Safari's address bar; `sw.js` caches `index.html` so the List
@@ -75,3 +78,77 @@ git add index.html && git commit -m "update site" && git push
 
 GitHub Pages (configured via `gh api repos/<owner>/<repo>/pages`, branch
 `main`, path `/`) picks up `index.html` automatically on push.
+
+## 5. The resume builder
+
+```bash
+python3 build_resume.py   # writes resume.html — no API key needed
+```
+
+`resume.html` is a self-contained resume editor: fill in the form on the left,
+watch an A4 page render on the right, then export.
+
+**What it borrows.** The document model and the page layout come from
+[Reactive Resume](https://github.com/amruthpillai/reactive-resume) (MIT) — the
+`basics` / `summary` / `sections` / `metadata` shape from their schema, and the
+single-column, centre-headed layout of their **Kakuna** template. Their app
+itself is a full stack (TanStack Start, PostgreSQL, Better Auth, Docker), which
+is not something this site can host — it's a static page on GitHub Pages. Taking
+the schema instead means **Back up** writes JSON that Reactive Resume
+recognises, so moving to the real app later needs no retyping.
+
+**Exports.**
+
+- **PDF** goes through the browser's own print pipeline (`window.print()` with a
+  print stylesheet, `@page { size: A4; margin: 0 }`). Output keeps real,
+  selectable text, which is what applicant tracking systems parse — a
+  canvas-to-image PDF looks identical on screen and reads as blank to them.
+  Choose "Save as PDF" as the destination.
+- **Word** builds the `.docx` in the page, in vanilla JS: a `.docx` is a ZIP of
+  XML parts, so the page assembles the five parts and writes the ZIP itself
+  (stored entries, hand-rolled CRC32). No bundler and no CDN, which is what lets
+  the page keep working offline from the Home Screen.
+- **Back up / Restore** read and write the whole document as JSON.
+
+**The baseline.** `resume.baseline.json` is Lolo's starting resume, committed
+next to the page and transcribed from her existing ATS resume. The editor
+fetches it on every load and reconciles like this:
+
+| On the device | What happens |
+| --- | --- |
+| Nothing saved yet | The baseline seeds the editor — she starts from her real resume, not a blank form |
+| Saved edits, baseline unchanged | Her edits load; the baseline is ignored |
+| Saved edits, baseline changed since she last saw it | Her edits load, plus a one-time bar offering to load the new baseline. **Dismiss** records the new signature so it does not nag again |
+
+The **Baseline** button re-pulls it on demand (with a confirm, since it
+replaces everything). A changed baseline is detected by hashing the fetched
+JSON and comparing against `lolo_resume_baseline_seen`.
+
+The baseline **never silently overwrites her edits**. That is deliberate:
+"always load from GitHub" and "she is midway through editing" are the same
+moment, and resolving it in the file's favour would be a data-loss bug wearing
+a feature's clothes. To change what she starts from, edit
+`resume.baseline.json`, push, and she gets the offer on her next load.
+
+**Where the data lives.** Her working copy is only in `localStorage` on her
+device, under `lolo_resume_v1`. Nothing is uploaded. Tell her to hit **Back up**
+occasionally — clearing Safari's site data would wipe it.
+
+**Privacy note on the baseline.** This repo is public, so everything in
+`resume.baseline.json` — including her email and phone — is readable at
+`https://<user>.github.io/lolo-job-hunt/resume.baseline.json`. The password gate
+is client-side JS on `index.html` and does not protect a static JSON file, and
+git history keeps the values even if they are removed later. This was a
+considered call: it buys a complete resume on any fresh device with no retyping.
+
+If that trade ever stops being worth it, blanking `basics.email` and
+`basics.phone` in this file is enough for future visitors — she types them once
+per device and `localStorage` remembers them — but scrubbing the values already
+pushed needs a history rewrite (`git filter-repo`) plus a force-push, and
+anything already scraped or cached is gone regardless.
+
+**Notes for future edits.** The design tokens at the top of `build_resume.py`
+are duplicated from `build_ghpages.py` (the two pages ship independently and
+neither imports the other) — change the accent in both places. The page-break
+dashed line in the preview marks where the printer will cut, which is the signal
+that matters when the goal is keeping a casual-work resume to one page.

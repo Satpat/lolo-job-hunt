@@ -1,0 +1,1517 @@
+#!/usr/bin/env python3
+"""Build resume.html — a self-contained resume builder for the Lolo Job Hunt site.
+
+Design/data lineage: the document model (basics / summary / sections / metadata)
+and the single-column centred layout are taken from Reactive Resume
+(https://github.com/amruthpillai/reactive-resume, MIT) — specifically its
+"Kakuna" template. Exported JSON is therefore shaped like a Reactive Resume
+document, so Lolo can move to the full app later without retyping anything.
+
+Nothing here needs a server: the page holds its own state in localStorage,
+prints to PDF through the browser's own print pipeline (real text, so ATS
+parsers can read it — not a rasterised screenshot), and writes .docx by
+assembling OOXML into a ZIP in vanilla JS.
+
+Run:  python3 build_resume.py   # writes resume.html
+"""
+
+from pathlib import Path
+
+BASE = Path(__file__).parent
+ACCENT_HEX = "#8e2a52"
+
+# NOTE: this token block is duplicated from build_ghpages.py on purpose — the
+# two pages ship independently and neither imports the other. If the accent
+# ever changes, change it in both places (and rerun generate_icons.py).
+HTML = r"""<!doctype html>
+<meta charset="utf-8" />
+<title>Resume &mdash; Lolo Job Hunt</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="__ACCENT__" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Lolo Resume" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" href="icon-512.png" />
+<style>
+:root {
+  --bg: #faf3f8;
+  --surface: #ffffff;
+  --surface-2: #f4e7f0;
+  --ink: #3a1e2e;
+  --ink-dim: #7c5568;
+  --ink-faint: #a98ca0;
+  --line: #ecd7e5;
+  --line-soft: #f2e2ec;
+  --accent: __ACCENT__;
+  --accent-ink: #ffffff;
+  --accent-soft: #f6dce7;
+  --radius: 10px;
+
+  --font-display: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  --font-body: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #1c0f17; --surface: #241620; --surface-2: #2c1b28;
+  --ink: #f3e4ec; --ink-dim: #c9a8bc; --ink-faint: #93748a;
+  --line: #3a2430; --line-soft: #2f1d29;
+  --accent: #e8709f; --accent-ink: #2a0f1c; --accent-soft: #3a2130;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+a { color: inherit; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ── app chrome ─────────────────────────────────────────────────────── */
+
+header.top { padding: 24px 16px 14px; max-width: 1180px; margin: 0 auto; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(26px, 5vw, 34px);
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.meta-line {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 16px 12px;
+}
+.controls-inner { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.tool-row { display: flex; gap: 8px; align-items: center; }
+.spacer { flex: 1 1 auto; }
+
+/* Overflow row uses the site's fade-mask convention, never flex-wrap. */
+.chip-row-wrap { position: relative; }
+.chip-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-right: 16px;
+  mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
+}
+.chip-row::-webkit-scrollbar { display: none; }
+
+.sheet-btn, .toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  height: 36px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sheet-btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+.sheet-btn:hover { opacity: 0.9; }
+.toggle-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink-dim); }
+.toggle-btn[data-active="1"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.view-toggle {
+  display: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.view-btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--surface);
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.view-btn + .view-btn { border-left: 1px solid var(--line); }
+.view-btn[data-active="1"] { background: var(--accent); color: var(--accent-ink); }
+
+select.mini {
+  font: inherit;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  height: 36px;
+  padding: 0 30px 0 10px;
+  flex: 0 0 auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  color: var(--ink);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%237c5568' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+:root[data-theme="dark"] select.mini {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%23c9a8bc' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* ── two-pane layout ────────────────────────────────────────────────── */
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 16px 80px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.preview-col { position: sticky; top: 96px; }
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  .view-toggle { display: flex; }
+  .preview-col { position: static; }
+  body[data-pane="edit"] .preview-col { display: none; }
+  body[data-pane="preview"] .form-col { display: none; }
+}
+
+/* ── the editor ─────────────────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.notice span { flex: 1 1 160px; min-width: 0; }
+
+.sec {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.sec[data-hidden="1"] { opacity: 0.5; }
+.sec-head { display: flex; gap: 6px; align-items: center; padding: 10px 12px; }
+.sec-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ico {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.ico:disabled { opacity: 0.25; cursor: default; }
+.ico.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+@media (hover: hover) and (pointer: fine) {
+  .ico:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+}
+
+.item { border-top: 1px solid var(--line-soft); padding: 12px; }
+.item-bar { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px; }
+.field { margin-bottom: 9px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 4px;
+}
+.field input, .field textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.field textarea { min-height: 74px; resize: vertical; line-height: 1.45; }
+.field input:focus, .field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.field .hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+@media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+
+.add-row { border-top: 1px solid var(--line-soft); padding: 10px 12px; }
+.add-btn {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+}
+.empty-note {
+  border-top: 1px solid var(--line-soft);
+  padding: 14px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+/* ── the page ───────────────────────────────────────────────────────── */
+
+.paper-frame { overflow: hidden; }
+.scaler { transform-origin: top left; }
+#paper { position: relative; }
+
+.sheet {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 12mm 14mm;
+  background: #fff;
+  color: #16181d;
+  box-shadow: 0 1px 2px rgba(58, 30, 46, 0.12), 0 12px 34px rgba(58, 30, 46, 0.14);
+  border-radius: 2px;
+  font-size: 10.5pt;
+  line-height: 1.42;
+}
+.sheet[data-font="georgia"] { font-family: Georgia, "Times New Roman", serif; }
+.sheet[data-font="arial"] { font-family: Arial, Helvetica, sans-serif; }
+.sheet[data-font="times"] { font-family: "Times New Roman", Times, serif; }
+
+.rs-head { text-align: center; margin-bottom: 6mm; }
+.rs-name {
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+.rs-headline { font-size: 10.5pt; margin-top: 1.5mm; }
+.rs-contact {
+  margin-top: 2.5mm;
+  font-size: 9.5pt;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1mm 4mm;
+}
+.rs-sec { margin-bottom: 5mm; }
+.rs-sec:last-child { margin-bottom: 0; }
+.rs-sec > h2 {
+  font-size: 11pt;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  margin: 0 0 2.5mm;
+  padding-bottom: 1mm;
+  color: var(--doc-accent);
+  border-bottom: 0.5pt solid var(--doc-accent);
+}
+.rs-item { margin-bottom: 3.5mm; }
+.rs-item:last-child { margin-bottom: 0; }
+.rs-row { display: flex; gap: 4mm; align-items: baseline; }
+.rs-row .rs-t { font-weight: 700; flex: 1 1 auto; min-width: 0; }
+.rs-row .rs-d { flex: 0 0 auto; font-size: 9.5pt; white-space: nowrap; }
+.rs-sub { font-size: 10pt; font-style: italic; }
+.rs-body { margin: 1mm 0 0; }
+.rs-body ul { margin: 0; padding-left: 4.5mm; }
+.rs-body li { margin-bottom: 0.6mm; }
+.rs-line { margin: 0; }
+.rs-skill { margin-bottom: 1.2mm; }
+.rs-skill b { font-weight: 700; }
+
+/* Where the printer will cut the page — purely an on-screen aid. */
+.pgguide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--accent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.pgguide span {
+  position: absolute;
+  right: 0;
+  top: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 999px;
+}
+.paper-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+.clear-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 8px 16px 40px;
+}
+footer .sig { font-family: var(--font-mono); }
+footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
+
+/* ── print: only the sheet survives ─────────────────────────────────── */
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff; margin: 0; padding: 0; }
+  body * { visibility: hidden; }
+  #paper, #paper * { visibility: visible; }
+  .controls, footer, header.top, .paper-meta, .pgguide { display: none !important; }
+  .preview-col, .paper-frame { position: static !important; overflow: visible !important; }
+  .scaler { transform: none !important; width: auto !important; height: auto !important; }
+  #paper { position: absolute; left: 0; top: 0; width: 210mm; }
+  .sheet { box-shadow: none; border-radius: 0; margin: 0; min-height: 0; }
+  .rs-sec, .rs-item { break-inside: avoid; page-break-inside: avoid; }
+  .rs-sec > h2 { break-after: avoid; page-break-after: avoid; }
+}
+</style>
+
+<header class="top">
+  <h1>Your resume, Lolo &#128156;</h1>
+  <p class="meta-line" id="cheerLine">fill it in on the left &rarr; it updates on the right</p>
+</header>
+
+<div class="controls">
+  <div class="controls-inner">
+    <div class="tool-row">
+      <a class="toggle-btn" href="./index.html">&larr; Jobs</a>
+      <div class="view-toggle">
+        <button class="view-btn" data-pane="edit" data-active="1">Edit</button>
+        <button class="view-btn" data-pane="preview" data-active="0">Preview</button>
+      </div>
+      <span class="spacer"></span>
+      <button class="toggle-btn" id="docxBtn">Word</button>
+      <button class="sheet-btn" id="pdfBtn">PDF</button>
+    </div>
+    <div class="chip-row-wrap">
+      <div class="chip-row">
+        <select class="mini" id="fontSel" title="Font">
+          <option value="georgia">Georgia</option>
+          <option value="arial">Arial</option>
+          <option value="times">Times</option>
+        </select>
+        <select class="mini" id="accentSel" title="Accent colour">
+          <option value="__ACCENT__">Burgundy</option>
+          <option value="#16181d">Black</option>
+          <option value="#1f3a5f">Navy</option>
+          <option value="#2f5d50">Forest</option>
+        </select>
+        <button class="toggle-btn" id="baselineBtn">Baseline</button>
+        <button class="toggle-btn" id="saveJsonBtn">Back&nbsp;up</button>
+        <button class="toggle-btn" id="loadJsonBtn">Restore</button>
+        <input type="file" id="jsonFile" accept="application/json,.json" hidden />
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="form-col">
+    <div class="notice" id="notice" hidden></div>
+    <div id="form"></div>
+  </div>
+  <div class="preview-col">
+    <div class="paper-meta">
+      <span id="pageCount"></span>
+      <span class="spacer"></span>
+      <span id="savedAt"></span>
+    </div>
+    <div class="paper-frame" id="paperFrame">
+      <div class="scaler" id="scaler">
+        <div id="paper"><div class="sheet" id="sheet"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Built on the <a href="https://github.com/amruthpillai/reactive-resume">Reactive&nbsp;Resume</a> schema (MIT).
+  <br />Everything stays on this device &mdash; nothing is uploaded.
+  <br /><span class="sig">VeerLo&trade;</span>
+</footer>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   Document model — a subset of the Reactive Resume schema, so that
+   "Back up" produces JSON their app recognises.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const STORE_KEY = "lolo_resume_v1";
+/* Signature of the baseline the last time she saw it, so a changed baseline can
+   be offered once rather than nagging on every load. */
+const SEEN_KEY = "lolo_resume_baseline_seen";
+const BASELINE_URL = "./resume.baseline.json";
+const ACCENT = "__ACCENT__";
+
+const SECTION_DEFS = {
+  summary: {
+    title: "About me",
+    single: true,
+    fields: [
+      { k: "content", label: "A few lines about you", type: "textarea",
+        ph: "Friendly and reliable, currently studying at La Trobe. Happy on my feet, quick to learn, and available most evenings and weekends." },
+    ],
+  },
+  experience: {
+    title: "Experience",
+    add: "Add a job",
+    empty: "No jobs yet — volunteering, helping at a family business and school work placements all count.",
+    fields: [
+      { k: "position", label: "Role", ph: "Barista", half: true },
+      { k: "company", label: "Where", ph: "Cafe on Grimshaw", half: true },
+      { k: "location", label: "Location", ph: "Bundoora VIC", half: true },
+      { k: "period", label: "When", ph: "Feb 2025 – now", half: true },
+      { k: "description", label: "What you did", type: "lines",
+        ph: "Served 150+ customers a shift on the coffee machine\nTrained two new starters on the POS",
+        hint: "One line per bullet point. Start with a verb." },
+    ],
+  },
+  education: {
+    title: "Education",
+    add: "Add a school or course",
+    fields: [
+      { k: "school", label: "School / uni", ph: "La Trobe University", half: true },
+      { k: "degree", label: "Qualification", ph: "Bachelor of Science", half: true },
+      { k: "area", label: "Subject", ph: "Computer Science", half: true },
+      { k: "period", label: "When", ph: "2025 – 2027", half: true },
+      { k: "description", label: "Highlights", type: "lines", ph: "Dean's list, first year" },
+    ],
+  },
+  projects: {
+    title: "Projects",
+    add: "Add a project",
+    fields: [
+      { k: "name", label: "Name", ph: "Bundoora Job Directory", half: true },
+      { k: "period", label: "When", ph: "2026", half: true },
+      { k: "description", label: "What it is", type: "lines", ph: "Mapped 300+ local businesses that hire casual staff" },
+    ],
+  },
+  skills: {
+    title: "Skills",
+    add: "Add a skill group",
+    fields: [
+      { k: "name", label: "Group", ph: "Customer service", half: true },
+      { k: "keywords", label: "Skills", type: "tags", ph: "POS systems, cash handling, barista",
+        hint: "Separate with commas.", half: true },
+    ],
+  },
+  certifications: {
+    title: "Certificates",
+    add: "Add a certificate",
+    empty: "RSA, Food Handling, First Aid and a Working with Children Check all belong here — employers screen on these.",
+    fields: [
+      { k: "title", label: "Certificate", ph: "Responsible Service of Alcohol (RSA)", half: true },
+      { k: "issuer", label: "Issued by", ph: "Victorian Commission for Gambling and Liquor Regulation", half: true },
+      { k: "date", label: "Date", ph: "March 2026", half: true },
+    ],
+  },
+  languages: {
+    title: "Languages",
+    add: "Add a language",
+    fields: [
+      { k: "language", label: "Language", ph: "Nepali", half: true },
+      { k: "fluency", label: "Level", ph: "Native", half: true },
+    ],
+  },
+  availability: {
+    title: "Availability",
+    single: true,
+    fields: [
+      { k: "content", label: "When you can work", type: "lines",
+        ph: "Weekday evenings from 5pm\nAll day Saturday and Sunday",
+        hint: "Casual employers read this first. One line each." },
+    ],
+  },
+};
+
+const ORDER = ["summary", "experience", "education", "projects", "skills",
+               "languages", "certifications", "availability"];
+
+const uid = () =>
+  (crypto.randomUUID ? crypto.randomUUID()
+                     : "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36));
+
+function blankItem(id) {
+  const it = { id: uid(), hidden: false };
+  for (const f of SECTION_DEFS[id].fields) it[f.k] = "";
+  return it;
+}
+
+function blankDoc() {
+  const doc = {
+    basics: { name: "", headline: "", email: "", phone: "", location: "",
+              website: { url: "", label: "" } },
+    summary: { title: SECTION_DEFS.summary.title, hidden: false, content: "" },
+    sections: {},
+    order: ORDER.slice(),
+    metadata: {
+      template: "kakuna",
+      typography: { body: { fontFamily: "georgia" } },
+      design: { colors: { primary: ACCENT } },
+    },
+  };
+  for (const id of ORDER) {
+    if (id === "summary") continue;
+    const def = SECTION_DEFS[id];
+    doc.sections[id] = def.single
+      ? { title: def.title, hidden: false, content: "" }
+      : { title: def.title, hidden: false, items: [] };
+  }
+  return doc;
+}
+
+/* Tolerant merge, so a hand-edited or Reactive-Resume-exported file that is
+   missing keys still loads instead of throwing. */
+function adopt(raw) {
+  const doc = blankDoc();
+  if (!raw || typeof raw !== "object") return doc;
+  Object.assign(doc.basics, raw.basics || {});
+  if (raw.basics && typeof raw.basics.website === "object" && raw.basics.website)
+    doc.basics.website = { url: raw.basics.website.url || "", label: raw.basics.website.label || "" };
+  else doc.basics.website = { url: "", label: "" };
+
+  if (raw.summary) {
+    doc.summary.content = stripHtml(raw.summary.content || "");
+    doc.summary.hidden = !!raw.summary.hidden;
+    if (raw.summary.title) doc.summary.title = raw.summary.title;
+  }
+  const src = raw.sections || {};
+  for (const id of ORDER) {
+    if (id === "summary" || !src[id]) continue;
+    const s = src[id], def = SECTION_DEFS[id], dst = doc.sections[id];
+    dst.hidden = !!s.hidden;
+    if (s.title) dst.title = s.title;
+    if (def.single) {
+      dst.content = stripHtml(s.content || "");
+    } else if (Array.isArray(s.items)) {
+      dst.items = s.items.map((it) => {
+        const out = { id: it.id || uid(), hidden: !!it.hidden };
+        for (const f of def.fields) {
+          const v = it[f.k];
+          out[f.k] = f.type === "tags" && Array.isArray(v) ? v.join(", ")
+                   : typeof v === "string" ? stripHtml(v)
+                   : "";
+        }
+        return out;
+      });
+    }
+  }
+  if (Array.isArray(raw.order))
+    doc.order = ORDER.filter((id) => raw.order.includes(id))
+      .sort((a, b) => raw.order.indexOf(a) - raw.order.indexOf(b));
+
+  const fam = raw.metadata?.typography?.body?.fontFamily;
+  if (["georgia", "arial", "times"].includes(fam)) doc.metadata.typography.body.fontFamily = fam;
+  const col = raw.metadata?.design?.colors?.primary;
+  if (typeof col === "string" && /^#[0-9a-f]{6}$/i.test(col)) doc.metadata.design.colors.primary = col;
+  return doc;
+}
+
+/* Reactive Resume stores descriptions as HTML; we edit plain text. Converting
+   <li> to newlines keeps their round-trip usable rather than showing markup. */
+function stripHtml(s) {
+  if (typeof s !== "string") return "";
+  if (!/[<&]/.test(s)) return s;
+  const t = s
+    .replace(/<\/(li|p|div|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "");
+  const d = document.createElement("textarea");
+  d.innerHTML = t;
+  return d.value.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+let doc = blankDoc();
+
+/* ══════════════════════════════════════════════════════════════════════
+   Persistence
+   ══════════════════════════════════════════════════════════════════════ */
+
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(doc));
+      const t = new Date();
+      document.getElementById("savedAt").textContent =
+        "saved " + t.getHours().toString().padStart(2, "0") + ":" +
+        t.getMinutes().toString().padStart(2, "0");
+    } catch (e) {
+      document.getElementById("savedAt").textContent = "couldn't save";
+    }
+  }, 400);
+}
+/* Returns true when a saved document was restored, which is what decides
+   whether the baseline may seed the page or merely offer itself. */
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return false;
+    doc = adopt(JSON.parse(raw));
+    return true;
+  } catch (e) {
+    return false; /* corrupt entry — fall through to a blank document */
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Editor
+   ══════════════════════════════════════════════════════════════════════ */
+
+const el = (tag, cls, txt) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (txt != null) n.textContent = txt;
+  return n;
+};
+
+function iconBtn(label, title, onClick, opts = {}) {
+  const b = el("button", "ico" + (opts.on ? " on" : ""), label);
+  b.title = title;
+  b.setAttribute("aria-label", title);
+  if (opts.disabled) b.disabled = true;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function fieldNode(def, value, onInput) {
+  const wrap = el("div", "field");
+  wrap.appendChild(el("label", null, def.label));
+  const multiline = def.type === "textarea" || def.type === "lines";
+  const input = document.createElement(multiline ? "textarea" : "input");
+  if (!multiline) input.type = def.type === "email" ? "email" : def.type === "tel" ? "tel" : "text";
+  input.value = value || "";
+  input.placeholder = def.ph || "";
+  if (def.type === "lines") input.rows = Math.max(3, (value || "").split("\n").length + 1);
+  input.addEventListener("input", () => onInput(input.value));
+  wrap.appendChild(input);
+  if (def.hint) wrap.appendChild(el("div", "hint", def.hint));
+  return wrap;
+}
+
+/* Half-width fields are paired into a two-up grid; full-width ones break it. */
+function layoutFields(container, defs, get, set) {
+  let row = null;
+  for (const f of defs) {
+    const node = fieldNode(f, get(f.k), (v) => { set(f.k, v); onChange(); });
+    if (f.half) {
+      if (!row) { row = el("div", "grid2"); container.appendChild(row); }
+      row.appendChild(node);
+      if (row.children.length === 2) row = null;
+    } else {
+      row = null;
+      container.appendChild(node);
+    }
+  }
+}
+
+const BASICS_FIELDS = [
+  { k: "name", label: "Full name", ph: "Lolo Panigrahi" },
+  { k: "headline", label: "One-line pitch", ph: "Hospitality & retail · available now", },
+  { k: "email", label: "Email", type: "email", ph: "you@example.com", half: true },
+  { k: "phone", label: "Phone", type: "tel", ph: "0400 000 000", half: true },
+  { k: "location", label: "Suburb", ph: "Bundoora VIC 3083", half: true },
+  { k: "websiteUrl", label: "Link (optional)", ph: "linkedin.com/in/…", half: true },
+];
+
+function renderForm() {
+  const root = document.getElementById("form");
+  root.textContent = "";
+
+  /* Basics is fixed at the top: it is the header, not a movable section. */
+  const bs = el("div", "sec");
+  const bh = el("div", "sec-head");
+  bh.appendChild(el("div", "sec-title", "Your details"));
+  bs.appendChild(bh);
+  const bbody = el("div", "item");
+  layoutFields(bbody, BASICS_FIELDS,
+    (k) => (k === "websiteUrl" ? doc.basics.website.url : doc.basics[k]),
+    (k, v) => { if (k === "websiteUrl") doc.basics.website.url = v; else doc.basics[k] = v; });
+  bs.appendChild(bbody);
+  root.appendChild(bs);
+
+  doc.order.forEach((id, idx) => {
+    const def = SECTION_DEFS[id];
+    const data = id === "summary" ? doc.summary : doc.sections[id];
+    const sec = el("div", "sec");
+    sec.dataset.hidden = data.hidden ? "1" : "0";
+
+    const head = el("div", "sec-head");
+    head.appendChild(el("div", "sec-title", data.title));
+    head.appendChild(iconBtn("↑", "Move section up",
+      () => { moveSection(idx, -1); }, { disabled: idx === 0 }));
+    head.appendChild(iconBtn("↓", "Move section down",
+      () => { moveSection(idx, 1); }, { disabled: idx === doc.order.length - 1 }));
+    head.appendChild(iconBtn(data.hidden ? "✕" : "◉",
+      data.hidden ? "Show this section" : "Hide this section",
+      () => { data.hidden = !data.hidden; onChange(); renderForm(); }));
+    sec.appendChild(head);
+
+    if (def.single) {
+      const body = el("div", "item");
+      layoutFields(body, def.fields, () => data.content, (_k, v) => { data.content = v; });
+      sec.appendChild(body);
+    } else {
+      data.items.forEach((item, i) => {
+        const box = el("div", "item");
+        const bar = el("div", "item-bar");
+        bar.appendChild(iconBtn("↑", "Move up",
+          () => { moveItem(data.items, i, -1); }, { disabled: i === 0 }));
+        bar.appendChild(iconBtn("↓", "Move down",
+          () => { moveItem(data.items, i, 1); }, { disabled: i === data.items.length - 1 }));
+        bar.appendChild(iconBtn("✕", "Remove", () => {
+          data.items.splice(i, 1);
+          onChange();
+          renderForm();
+        }));
+        box.appendChild(bar);
+        layoutFields(box, def.fields, (k) => item[k], (k, v) => { item[k] = v; });
+        sec.appendChild(box);
+      });
+
+      if (!data.items.length && def.empty) sec.appendChild(el("div", "empty-note", def.empty));
+
+      const addRow = el("div", "add-row");
+      const add = el("button", "add-btn", def.add || "Add");
+      add.addEventListener("click", () => {
+        data.items.push(blankItem(id));
+        onChange();
+        renderForm();
+      });
+      addRow.appendChild(add);
+      sec.appendChild(addRow);
+    }
+    root.appendChild(sec);
+  });
+}
+
+function moveSection(idx, delta) {
+  const to = idx + delta;
+  if (to < 0 || to >= doc.order.length) return;
+  const [x] = doc.order.splice(idx, 1);
+  doc.order.splice(to, 0, x);
+  onChange();
+  renderForm();
+}
+function moveItem(arr, idx, delta) {
+  const to = idx + delta;
+  if (to < 0 || to >= arr.length) return;
+  const [x] = arr.splice(idx, 1);
+  arr.splice(to, 0, x);
+  onChange();
+  renderForm();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Preview — the layout is Reactive Resume's "Kakuna": one column, centred
+   header, centred section headings sitting on a rule in the accent colour.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const lines = (s) => (s || "").split("\n").map((l) => l.trim()).filter(Boolean);
+const has = (...vals) => vals.some((v) => (v || "").trim());
+const join = (sep, ...parts) => parts.filter((p) => (p || "").trim()).join(sep);
+
+function bulletNode(text) {
+  const ls = lines(text);
+  if (!ls.length) return null;
+  const body = el("div", "rs-body");
+  if (ls.length === 1) {
+    body.appendChild(el("p", "rs-line", ls[0]));
+  } else {
+    const ul = document.createElement("ul");
+    for (const l of ls) ul.appendChild(el("li", null, l));
+    body.appendChild(ul);
+  }
+  return body;
+}
+
+function twoUp(title, date) {
+  const row = el("div", "rs-row");
+  row.appendChild(el("span", "rs-t", title));
+  if ((date || "").trim()) row.appendChild(el("span", "rs-d", date));
+  return row;
+}
+
+const ITEM_RENDER = {
+  experience: (it) => {
+    const box = el("div", "rs-item");
+    box.appendChild(twoUp(it.position || it.company, it.period));
+    const sub = join(" · ", it.position ? it.company : "", it.location);
+    if (sub) box.appendChild(el("div", "rs-sub", sub));
+    const b = bulletNode(it.description);
+    if (b) box.appendChild(b);
+    return has(it.position, it.company, it.period, it.description) ? box : null;
+  },
+  education: (it) => {
+    const box = el("div", "rs-item");
+    box.appendChild(twoUp(it.school, it.period));
+    const sub = join(" · ", it.degree, it.area);
+    if (sub) box.appendChild(el("div", "rs-sub", sub));
+    const b = bulletNode(it.description);
+    if (b) box.appendChild(b);
+    return has(it.school, it.degree, it.area, it.period) ? box : null;
+  },
+  projects: (it) => {
+    const box = el("div", "rs-item");
+    box.appendChild(twoUp(it.name, it.period));
+    const b = bulletNode(it.description);
+    if (b) box.appendChild(b);
+    return has(it.name, it.description) ? box : null;
+  },
+  skills: (it) => {
+    if (!has(it.name, it.keywords)) return null;
+    const p = el("p", "rs-skill");
+    if ((it.name || "").trim()) {
+      p.appendChild(el("b", null, it.name + (it.keywords.trim() ? ": " : "")));
+    }
+    p.appendChild(document.createTextNode(it.keywords || ""));
+    return p;
+  },
+  languages: (it) => {
+    if (!has(it.language, it.fluency)) return null;
+    const p = el("p", "rs-skill");
+    p.appendChild(el("b", null, it.language + (it.fluency.trim() ? ": " : "")));
+    p.appendChild(document.createTextNode(it.fluency || ""));
+    return p;
+  },
+  certifications: (it) => {
+    if (!has(it.title, it.issuer, it.date)) return null;
+    const box = el("div", "rs-item");
+    box.appendChild(twoUp(it.title, it.date));
+    if ((it.issuer || "").trim()) box.appendChild(el("div", "rs-sub", it.issuer));
+    return box;
+  },
+};
+
+function renderPreview() {
+  const sheet = document.getElementById("sheet");
+  sheet.textContent = "";
+  sheet.dataset.font = doc.metadata.typography.body.fontFamily;
+  sheet.style.setProperty("--doc-accent", doc.metadata.design.colors.primary);
+
+  const head = el("div", "rs-head");
+  head.appendChild(el("div", "rs-name", doc.basics.name || "Your name"));
+  if ((doc.basics.headline || "").trim())
+    head.appendChild(el("div", "rs-headline", doc.basics.headline));
+  const contacts = [doc.basics.email, doc.basics.phone, doc.basics.location,
+                    doc.basics.website.url].filter((c) => (c || "").trim());
+  if (contacts.length) {
+    const row = el("div", "rs-contact");
+    for (const c of contacts) row.appendChild(el("span", null, c));
+    head.appendChild(row);
+  }
+  sheet.appendChild(head);
+
+  for (const id of doc.order) {
+    const def = SECTION_DEFS[id];
+    const data = id === "summary" ? doc.summary : doc.sections[id];
+    if (data.hidden) continue;
+
+    let body;
+    if (def.single) {
+      body = bulletNode(data.content);
+      if (!body) continue;
+    } else {
+      const nodes = data.items
+        .filter((it) => !it.hidden)
+        .map((it) => ITEM_RENDER[id](it))
+        .filter(Boolean);
+      if (!nodes.length) continue;
+      body = el("div");
+      for (const n of nodes) body.appendChild(n);
+    }
+    const sec = el("section", "rs-sec");
+    sec.appendChild(el("h2", null, data.title));
+    sec.appendChild(body);
+    sheet.appendChild(sec);
+  }
+  fitPaper();
+}
+
+/* Scale the A4 sheet down to whatever the preview column can spare, and mark
+   where the printer will break pages — the single most useful signal when the
+   goal is "keep it to one page". */
+function fitPaper() {
+  const frame = document.getElementById("paperFrame");
+  const scaler = document.getElementById("scaler");
+  const paper = document.getElementById("paper");
+  const sheet = document.getElementById("sheet");
+
+  scaler.style.transform = "none";
+  scaler.style.height = "";
+  const sheetW = sheet.offsetWidth;
+  const avail = frame.clientWidth;
+  if (!sheetW || !avail) return;
+
+  const scale = Math.min(1, avail / sheetW);
+  scaler.style.transform = "scale(" + scale + ")";
+  scaler.style.width = sheetW + "px";
+  scaler.style.height = paper.offsetHeight * scale + "px";
+
+  paper.querySelectorAll(".pgguide").forEach((n) => n.remove());
+  const pageH = mmToPx(297);
+  const total = sheet.offsetHeight;
+  const pages = Math.max(1, Math.ceil(total / pageH - 0.02));
+  for (let i = 1; i < pages; i++) {
+    const g = el("div", "pgguide");
+    g.style.top = pageH * i + "px";
+    g.appendChild(el("span", null, "page " + (i + 1)));
+    paper.appendChild(g);
+  }
+  document.getElementById("pageCount").textContent =
+    pages === 1 ? "1 page — nice and tight" : pages + " pages";
+}
+
+let mmProbe = null;
+function mmToPx(mm) {
+  if (!mmProbe) {
+    mmProbe = document.createElement("div");
+    mmProbe.style.cssText = "position:absolute;visibility:hidden;height:100mm;width:0";
+    document.body.appendChild(mmProbe);
+  }
+  return (mmProbe.offsetHeight / 100) * mm;
+}
+
+function onChange() {
+  renderPreview();
+  save();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PDF — hand off to the browser's print pipeline. The output keeps real,
+   selectable text, which is what applicant tracking systems parse; a
+   canvas-to-image PDF would look identical and read as blank to them.
+   ══════════════════════════════════════════════════════════════════════ */
+
+function fileStem() {
+  const n = (doc.basics.name || "Resume").trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "_");
+  return (n || "Resume") + "_Resume";
+}
+
+document.getElementById("pdfBtn").addEventListener("click", () => {
+  /* Most browsers seed the "Save as PDF" filename from the document title. */
+  const prev = document.title;
+  document.title = fileStem();
+  const restore = () => { document.title = prev; window.removeEventListener("afterprint", restore); };
+  window.addEventListener("afterprint", restore);
+  window.print();
+  setTimeout(restore, 8000);
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   DOCX — a .docx is a ZIP of XML parts. Writing one by hand (stored, i.e.
+   uncompressed, entries) avoids shipping a bundler or a CDN dependency,
+   which matters because this page has to work offline from the home screen.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function zip(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xffff;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xffff;
+
+  const parts = [];
+  const central = [];
+  let offset = 0;
+
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const data = enc.encode(f.data);
+    const crc = crc32(data);
+
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);
+    local.setUint16(4, 20, true);
+    local.setUint16(6, 0x0800, true);   // UTF-8 filenames
+    local.setUint16(8, 0, true);        // stored, no compression
+    local.setUint16(10, dosTime, true);
+    local.setUint16(12, dosDate, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, data.length, true);
+    local.setUint32(22, data.length, true);
+    local.setUint16(26, name.length, true);
+    local.setUint16(28, 0, true);
+    parts.push(new Uint8Array(local.buffer), name, data);
+
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true);
+    cd.setUint16(4, 20, true);
+    cd.setUint16(6, 20, true);
+    cd.setUint16(8, 0x0800, true);
+    cd.setUint16(10, 0, true);
+    cd.setUint16(12, dosTime, true);
+    cd.setUint16(14, dosDate, true);
+    cd.setUint32(16, crc, true);
+    cd.setUint32(20, data.length, true);
+    cd.setUint32(24, data.length, true);
+    cd.setUint16(28, name.length, true);
+    cd.setUint32(42, offset, true);
+    central.push(new Uint8Array(cd.buffer), name);
+
+    offset += 30 + name.length + data.length;
+  }
+
+  const cdStart = offset;
+  let cdSize = 0;
+  for (const c of central) cdSize += c.length;
+
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true);
+  end.setUint32(16, cdStart, true);
+
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)],
+                  { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+
+const xmlEsc = (s) => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+const DOCX_FONTS = { georgia: "Georgia", arial: "Arial", times: "Times New Roman" };
+
+/* A4 (11906 x 16838 twips) less 14mm/12mm margins, matching the CSS sheet. */
+const MARGIN_X = 794, MARGIN_Y = 680;
+const CONTENT_W = 11906 - MARGIN_X * 2;
+
+function run(text, o = {}) {
+  const rpr = [];
+  if (o.b) rpr.push("<w:b/>");
+  if (o.i) rpr.push("<w:i/>");
+  if (o.sz) rpr.push('<w:sz w:val="' + o.sz + '"/><w:szCs w:val="' + o.sz + '"/>');
+  if (o.color) rpr.push('<w:color w:val="' + o.color + '"/>');
+  if (o.caps) rpr.push("<w:caps/>");
+  if (o.spacing) rpr.push('<w:spacing w:val="' + o.spacing + '"/>');
+  return "<w:r>" + (rpr.length ? "<w:rPr>" + rpr.join("") + "</w:rPr>" : "") +
+         '<w:t xml:space="preserve">' + xmlEsc(text) + "</w:t></w:r>";
+}
+
+function para(runs, o = {}) {
+  const ppr = [];
+  if (o.align) ppr.push('<w:jc w:val="' + o.align + '"/>');
+  if (o.rule) ppr.push('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="' + o.rule + '"/></w:pBdr>');
+  if (o.tabRight) ppr.push('<w:tabs><w:tab w:val="right" w:pos="' + CONTENT_W + '"/></w:tabs>');
+  if (o.bullet) ppr.push('<w:ind w:left="284" w:hanging="284"/>');
+  const sp = [];
+  if (o.before != null) sp.push('w:before="' + o.before + '"');
+  if (o.after != null) sp.push('w:after="' + o.after + '"');
+  if (sp.length) ppr.push("<w:spacing " + sp.join(" ") + "/>");
+  return "<w:p>" + (ppr.length ? "<w:pPr>" + ppr.join("") + "</w:pPr>" : "") + runs + "</w:p>";
+}
+
+/* Real Word list numbering needs a numbering.xml part and a style chain. A
+   literal bullet with a hanging indent renders the same, survives every
+   converter, and keeps the package to four parts. */
+const bullet = (text, sz) =>
+  para(run("•\t" + text, { sz }), { bullet: true, after: 20 });
+
+function buildDocxBody() {
+  const accent = doc.metadata.design.colors.primary.replace("#", "").toUpperCase();
+  const B = 21;   // body: 10.5pt, in half-points
+  const out = [];
+
+  out.push(para(run(doc.basics.name || "Your name", { b: true, sz: 40 }),
+                { align: "center", after: 20 }));
+  if ((doc.basics.headline || "").trim())
+    out.push(para(run(doc.basics.headline, { sz: B }), { align: "center", after: 20 }));
+  const contacts = [doc.basics.email, doc.basics.phone, doc.basics.location, doc.basics.website.url]
+    .filter((c) => (c || "").trim());
+  if (contacts.length)
+    out.push(para(run(contacts.join("   ·   "), { sz: 19 }), { align: "center", after: 40 }));
+
+  const heading = (t) => out.push(
+    para(run(t, { b: true, sz: 22, color: accent, caps: true, spacing: 22 }),
+         { align: "center", rule: accent, before: 200, after: 100 }));
+
+  /* Gaps between items come from `before` spacing on the next item's heading.
+     An empty <w:p> would work too but costs a full blank line in Word. */
+  const titleDate = (title, date, gap) => {
+    const o = { after: 0, before: gap ? 120 : 0 };
+    if (!(date || "").trim()) return para(run(title, { b: true, sz: B }), o);
+    o.tabRight = true;
+    return para(run(title, { b: true, sz: B }) + "<w:r><w:tab/></w:r>" + run(date, { sz: 19 }), o);
+  };
+  const sub = (t) => out.push(para(run(t, { i: true, sz: 20 }), { after: 20 }));
+  const bullets = (text) => { for (const l of lines(text)) out.push(bullet(l, B)); };
+
+  for (const id of doc.order) {
+    const def = SECTION_DEFS[id];
+    const data = id === "summary" ? doc.summary : doc.sections[id];
+    if (data.hidden) continue;
+
+    if (def.single) {
+      const ls = lines(data.content);
+      if (!ls.length) continue;
+      heading(data.title);
+      if (ls.length === 1) out.push(para(run(ls[0], { sz: B }), { after: 40 }));
+      else bullets(data.content);
+      continue;
+    }
+
+    const items = data.items.filter((it) => !it.hidden);
+    const useful = items.filter((it) => Object.entries(it)
+      .some(([k, v]) => k !== "id" && k !== "hidden" && (v || "").trim()));
+    if (!useful.length) continue;
+    heading(data.title);
+
+    useful.forEach((it, i) => {
+      if (id === "experience") {
+        out.push(titleDate(it.position || it.company, it.period, i));
+        const s = join(" · ", it.position ? it.company : "", it.location);
+        if (s) sub(s);
+        bullets(it.description);
+      } else if (id === "education") {
+        out.push(titleDate(it.school, it.period, i));
+        const s = join(" · ", it.degree, it.area);
+        if (s) sub(s);
+        bullets(it.description);
+      } else if (id === "projects") {
+        out.push(titleDate(it.name, it.period, i));
+        bullets(it.description);
+      } else if (id === "certifications") {
+        out.push(titleDate(it.title, it.date, i));
+        if ((it.issuer || "").trim()) sub(it.issuer);
+      } else if (id === "skills") {
+        out.push(para(run(it.name + (it.keywords.trim() ? ": " : ""), { b: true, sz: B }) +
+                      run(it.keywords, { sz: B }), { after: 30 }));
+      } else if (id === "languages") {
+        out.push(para(run(it.language + (it.fluency.trim() ? ": " : ""), { b: true, sz: B }) +
+                      run(it.fluency, { sz: B }), { after: 30 }));
+      }
+    });
+  }
+
+  out.push('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
+           '<w:pgMar w:top="' + MARGIN_Y + '" w:right="' + MARGIN_X + '" w:bottom="' + MARGIN_Y +
+           '" w:left="' + MARGIN_X + '" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>');
+  return out.join("");
+}
+
+function buildDocx() {
+  const font = DOCX_FONTS[doc.metadata.typography.body.fontFamily] || "Georgia";
+  const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+
+  return zip([
+    { name: "[Content_Types].xml", data: head +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+      "</Types>" },
+    { name: "_rels/.rels", data: head +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      "</Relationships>" },
+    { name: "word/_rels/document.xml.rels", data: head +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      "</Relationships>" },
+    { name: "word/styles.xml", data: head +
+      "<w:styles " + W + "><w:docDefaults><w:rPrDefault><w:rPr>" +
+      '<w:rFonts w:ascii="' + font + '" w:hAnsi="' + font + '" w:cs="' + font + '"/>' +
+      '<w:sz w:val="21"/><w:szCs w:val="21"/></w:rPr></w:rPrDefault>' +
+      '<w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault>' +
+      "</w:docDefaults>" +
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
+      "</w:styles>" },
+    { name: "word/document.xml", data: head +
+      "<w:document " + W + "><w:body>" + buildDocxBody() + "</w:body></w:document>" },
+  ]);
+}
+
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+document.getElementById("docxBtn").addEventListener("click", () => {
+  download(buildDocx(), fileStem() + ".docx");
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Backup / restore / example
+   ══════════════════════════════════════════════════════════════════════ */
+
+document.getElementById("saveJsonBtn").addEventListener("click", () => {
+  download(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
+           fileStem() + ".json");
+});
+
+document.getElementById("loadJsonBtn").addEventListener("click", () =>
+  document.getElementById("jsonFile").click());
+
+document.getElementById("jsonFile").addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      doc = adopt(JSON.parse(r.result));
+      syncControls();
+      renderForm();
+      onChange();
+    } catch (err) {
+      alert("That file didn't look like a resume backup.");
+    }
+  };
+  r.readAsText(file);
+  e.target.value = "";
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Baseline — a resume.baseline.json committed next to this page. It seeds a
+   device that has nothing saved yet, and thereafter only ever *offers* itself,
+   because silently overwriting her edits with a file from the repo would be a
+   data-loss bug wearing a feature's clothes.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* djb2, just enough to notice the committed baseline changed. */
+function stamp(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+function applyBaseline(raw, sig) {
+  doc = adopt(raw);
+  try { localStorage.setItem(SEEN_KEY, sig); } catch (e) {}
+  hideNotice();
+  syncControls();
+  renderForm();
+  onChange();
+}
+
+function hideNotice() { document.getElementById("notice").hidden = true; }
+
+function showNotice(message, actionLabel, onAction, onDismiss) {
+  const n = document.getElementById("notice");
+  n.textContent = "";
+  n.appendChild(el("span", null, message));
+  if (actionLabel) {
+    const go = el("button", "clear-btn", actionLabel);
+    go.addEventListener("click", onAction);
+    n.appendChild(go);
+  }
+  const no = el("button", "clear-btn", "Dismiss");
+  no.addEventListener("click", () => { hideNotice(); if (onDismiss) onDismiss(); });
+  n.appendChild(no);
+  n.hidden = false;
+}
+
+async function fetchBaseline() {
+  /* no-store: the point of the baseline is that a fresh push shows up. */
+  const res = await fetch(BASELINE_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const raw = await res.json();
+  return { raw, sig: stamp(JSON.stringify(raw)) };
+}
+
+async function syncBaseline(hadLocal) {
+  let got;
+  try {
+    got = await fetchBaseline();
+  } catch (e) {
+    /* Offline, or opened straight off the disk — the saved copy is fine. */
+    return;
+  }
+  if (!hadLocal) {
+    applyBaseline(got.raw, got.sig);
+    return;
+  }
+  let seen = null;
+  try { seen = localStorage.getItem(SEEN_KEY); } catch (e) {}
+  if (seen === got.sig) return;
+  showNotice(
+    "The saved baseline was updated.",
+    "Load it (replaces your edits)",
+    () => {
+      if (!confirm("Replace everything here with the baseline resume?")) return;
+      applyBaseline(got.raw, got.sig);
+    },
+    () => { try { localStorage.setItem(SEEN_KEY, got.sig); } catch (e) {} }
+  );
+}
+
+document.getElementById("baselineBtn").addEventListener("click", async () => {
+  let got;
+  try {
+    got = await fetchBaseline();
+  } catch (e) {
+    showNotice("Couldn't reach the baseline file — you may be offline.");
+    return;
+  }
+  if (!confirm("Replace everything here with the baseline resume?")) return;
+  applyBaseline(got.raw, got.sig);
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Wiring
+   ══════════════════════════════════════════════════════════════════════ */
+
+document.getElementById("fontSel").addEventListener("change", (e) => {
+  doc.metadata.typography.body.fontFamily = e.target.value;
+  onChange();
+});
+document.getElementById("accentSel").addEventListener("change", (e) => {
+  doc.metadata.design.colors.primary = e.target.value;
+  onChange();
+});
+
+document.querySelectorAll(".view-btn").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    document.body.dataset.pane = btn.dataset.pane;
+    document.querySelectorAll(".view-btn").forEach((b) => (b.dataset.active = b === btn ? "1" : "0"));
+    if (btn.dataset.pane === "preview") requestAnimationFrame(fitPaper);
+  })
+);
+
+function syncControls() {
+  document.getElementById("fontSel").value = doc.metadata.typography.body.fontFamily;
+  const accents = [...document.getElementById("accentSel").options].map((o) => o.value);
+  document.getElementById("accentSel").value =
+    accents.includes(doc.metadata.design.colors.primary) ? doc.metadata.design.colors.primary : ACCENT;
+}
+
+/* The site is used on both an iPhone and a MacBook, so the pane default keys
+   off the layout that is actually active, not a stored preference. */
+document.body.dataset.pane = "edit";
+
+if (window.ResizeObserver)
+  new ResizeObserver(() => fitPaper()).observe(document.getElementById("paperFrame"));
+window.addEventListener("resize", fitPaper);
+
+/* Render whatever is on the device first so the page is usable immediately,
+   then reconcile with the committed baseline once the network answers. */
+const hadLocal = load();
+syncControls();
+renderForm();
+renderPreview();
+document.getElementById("savedAt").textContent = "";
+syncBaseline(hadLocal);
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+</script>
+"""
+
+out = BASE / "resume.html"
+out.write_text(HTML.replace("__ACCENT__", ACCENT_HEX), encoding="utf-8")
+print(f"Wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
