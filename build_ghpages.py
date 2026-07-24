@@ -303,6 +303,22 @@ select#sortSel {{
 }}
 .sheet-btn:hover {{ opacity: 0.9; }}
 
+.toggle-btn {{
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-dim);
+  cursor: pointer;
+}}
+.toggle-btn[data-active="1"] {{ background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }}
+
 .chip-row-wrap {{ position: relative; }}
 .chip-row {{
   display: flex;
@@ -635,6 +651,7 @@ a {{ color: inherit; }}
     transform: translateY(-1px);
   }}
   .chip:hover:not([data-active="1"]) {{ border-color: var(--accent); color: var(--accent); }}
+  .toggle-btn:hover:not([data-active="1"]) {{ border-color: var(--accent); color: var(--accent); }}
   #search:hover {{ border-color: var(--ink-faint); }}
 }}
 
@@ -748,7 +765,7 @@ a {{ color: inherit; }}
         <button class="view-btn" data-view="map" data-active="0">Map</button>
       </div>
       <a class="sheet-btn" href="{SHEET_URL}" target="_blank" rel="noopener">Sheet</a>
-      <button id="viewedOnlyBtn" class="chip" data-active="0">Viewed only</button>
+      <button id="viewedOnlyBtn" class="toggle-btn" data-active="0">Viewed only</button>
     </div>
     <div class="chip-row-wrap"><div class="chip-row" id="groupChips"></div></div>
     <div class="chip-row-wrap"><div class="chip-row" id="suburbChips"></div></div>
