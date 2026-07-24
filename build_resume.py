@@ -65,7 +65,17 @@ COLOURS = [
 COLOUR_OPTIONS = "\n".join(f'<option value="{h}">{label}</option>' for h, label in COLOURS)
 
 # ── templates: (id, label) ───────────────────────────────────────────────────
-TEMPLATES = [("kakuna", "Centered"), ("onyx", "Left"), ("compact", "Compact"), ("sidebar", "Sidebar")]
+# All are hand-built CSS layouts for the on-screen/PDF sheet; the Word export
+# stays single-column regardless (ATS-clean). Ordered single-column first.
+TEMPLATES = [
+    ("kakuna", "Centered"),
+    ("onyx", "Left"),
+    ("underline", "Underline"),
+    ("minimal", "Minimal"),
+    ("banner", "Banner"),
+    ("compact", "Compact"),
+    ("sidebar", "Sidebar"),
+]
 TEMPLATE_OPTIONS = "\n".join(f'<option value="{i}">{label}</option>' for i, label in TEMPLATES)
 TEMPLATE_IDS = [i for i, _ in TEMPLATES]
 
@@ -469,6 +479,42 @@ __FONT_CSS__
 .rs-sidebar .rs-sec > h2 { text-align: left; font-size: 10pt; }
 .rs-sidebar .rs-sec { margin-top: 5mm; margin-bottom: 0; }
 
+/* underline — left-aligned; a short accent bar under each heading (no full rule) */
+.sheet[data-template="underline"] .rs-head { text-align: left; }
+.sheet[data-template="underline"] .rs-photo { margin: 0 0 3mm; }
+.sheet[data-template="underline"] .rs-contact { justify-content: flex-start; }
+.sheet[data-template="underline"] .rs-sec > h2 {
+  text-align: left; border-bottom: none; padding-bottom: 0; margin-bottom: 2mm;
+}
+.sheet[data-template="underline"] .rs-sec > h2::after {
+  content: ""; display: block; width: 12mm; height: 1.4pt;
+  background: var(--doc-accent); margin-top: 1.2mm;
+}
+
+/* minimal — left-aligned, no rules, airy, wide-tracked headings */
+.sheet[data-template="minimal"] .rs-head { text-align: left; }
+.sheet[data-template="minimal"] .rs-photo { margin: 0 0 3mm; }
+.sheet[data-template="minimal"] .rs-contact { justify-content: flex-start; }
+.sheet[data-template="minimal"] .rs-sec { margin-bottom: 6mm; }
+.sheet[data-template="minimal"] .rs-sec > h2 {
+  text-align: left; border-bottom: none; padding-bottom: 0; margin-bottom: 2mm;
+  font-size: 10pt; letter-spacing: 0.18em;
+}
+
+/* banner — full-bleed accent header band behind the name/contact */
+.sheet[data-template="banner"] .rs-head {
+  margin: -12mm -14mm 6mm;            /* cancel the sheet padding to bleed to edges */
+  padding: 10mm 14mm 7mm;
+  background: var(--doc-accent);
+  color: #fff;
+  text-align: center;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.sheet[data-template="banner"] .rs-head .rs-name,
+.sheet[data-template="banner"] .rs-head .rs-headline { color: #fff; }
+.sheet[data-template="banner"] .rs-head .rs-contact a { color: #fff; }
+.sheet[data-template="banner"] .rs-photo { border: 2px solid rgba(255,255,255,0.6); }
+
 /* cover letter layout */
 .rs-letter { font-size: 10.5pt; line-height: 1.5; }
 .rs-letter .lt-from { margin-bottom: 6mm; }
@@ -537,13 +583,15 @@ footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
     </div>
     <div class="chip-row-wrap">
       <div class="chip-row">
-        <span class="chip-label">Style</span>
-        <select class="mini" id="templateSel" title="Template — page layout">
+        <span class="chip-label">Template</span>
+        <select class="mini" id="templateSel" title="Page layout">
 __TEMPLATE_OPTIONS__
         </select>
+        <span class="chip-label">Font</span>
         <select class="mini" id="fontSel" title="Font">
 __FONT_OPTIONS__
         </select>
+        <span class="chip-label">Colour</span>
         <select class="mini" id="accentSel" title="Accent colour">
 __COLOUR_OPTIONS__
           <option value="custom">Custom&hellip;</option>
