@@ -79,6 +79,46 @@ TEMPLATES = [
 TEMPLATE_OPTIONS = "\n".join(f'<option value="{i}">{label}</option>' for i, label in TEMPLATES)
 TEMPLATE_IDS = [i for i, _ in TEMPLATES]
 
+# ── roles (what job Lolo wants at the business — fed into tailoring) ──────────
+# (label, indicative casual pay). Pay is a hint for her only; the value sent to
+# the Worker is just the role name.
+ROLE_GROUPS = [
+    ("Hospitality & food", [
+        ("Barista / Café all-rounder", "$22–35/hr"),
+        ("Waiter / Food runner", "$24–28/hr"),
+        ("Kitchen hand", "$22–26/hr"),
+        ("Front of house / Host", ""),
+    ]),
+    ("Retail & supermarkets", [
+        ("Retail sales assistant", "$20–25/hr"),
+        ("Supermarket team member", "$23–27/hr"),
+        ("Checkout operator", ""),
+        ("Night fill / Stocker", ""),
+    ]),
+    ("Care & education", [
+        ("Tutor", "$25–40/hr"),
+        ("Disability / Aged care support worker", "$28–35/hr"),
+        ("Childcare assistant", ""),
+    ]),
+    ("Admin & campus", [
+        ("Receptionist / Admin assistant", "$24–30/hr"),
+        ("University / Library assistant", "$25–32/hr"),
+    ]),
+    ("General", [
+        ("Customer service", ""),
+        ("General all-rounder", ""),
+    ]),
+]
+# A sensible default role per business group, pre-selected in the picker.
+DEFAULT_ROLE_BY_GRP = {
+    "Hospo": "Barista / Café all-rounder",
+    "Grocery": "Supermarket team member",
+    "Retail": "Retail sales assistant",
+    "Health": "Receptionist / Admin assistant",
+    "Fitness": "Receptionist / Admin assistant",
+    "Family": "Childcare assistant",
+}
+
 # ── businesses (for the tailoring picker) ────────────────────────────────────
 # Category maps duplicated from build_ghpages.py on purpose (the two pages ship
 # independently). Keep in sync if categories change.
@@ -640,6 +680,8 @@ __COLOUR_OPTIONS__
 const ACCENT = "__ACCENT__";
 const WORKER_URL = "__WORKER_URL__";
 const BUSINESSES = __BUSINESSES__;
+const ROLE_GROUPS = __ROLE_GROUPS__;
+const DEFAULT_ROLE_BY_GRP = __DEFAULT_ROLE_BY_GRP__;
 const FONT_IDS = __FONT_IDS__;
 const TEMPLATE_IDS = __TEMPLATE_IDS__;
 const DOCX_FONTS = __DOCX_FONTS__;
@@ -855,7 +897,7 @@ function persistActiveTailor() {
   if (!activeTailor) return;
   const map = loadTailors();
   map[activeTailor.businessId] = {
-    name: activeTailor.name, business: activeTailor.business,
+    name: activeTailor.name, business: activeTailor.business, role: activeTailor.role || "",
     fields: activeTailor.fields, at: Date.now(),
   };
   saveTailors(map);
@@ -1662,15 +1704,69 @@ function clearTailor() {
   activeTailor = null; mode = "resume";
   setModeToggle();
 }
+const tailorLabel = (name, role) => name + ((role || "").trim() ? " · " + role : "");
+
 function activateTailor(id, entry) {
   const biz = (entry && entry.business) || bizById(id);
-  activeTailor = { businessId: id, name: (biz && biz.name) || "Business", business: biz, fields: entry.fields };
+  activeTailor = { businessId: id, name: (biz && biz.name) || "Business", business: biz, role: entry.role || "", fields: entry.fields };
   setModeToggle();
-  showNotice("Tailored for " + activeTailor.name + ".", "Clear", () => { clearTailor(); renderForm(); renderPreview(); });
+  showNotice("Tailored for " + tailorLabel(activeTailor.name, activeTailor.role) + ".", "Clear",
+    () => { clearTailor(); renderForm(); renderPreview(); });
   renderForm(); renderPreview();
 }
 
-async function tailorFor(id) {
+/* A role picker in the notice bar: choose which job she wants at this business,
+   then tailor. Started from a jobs-card deep link (resume.html?biz=<id>). */
+function promptTailor(biz) {
+  const n = document.getElementById("notice");
+  n.className = "notice"; n.textContent = "";
+  n.appendChild(el("span", null, "Tailor for " + biz.name + " — role:"));
+  const sel = buildRoleSelect(biz.grp);
+  n.appendChild(sel);
+  const go = el("button", "clear-btn", "Tailor now");
+  go.addEventListener("click", () => {
+    const role = sel.value === "__custom__" ? "" : sel.value;
+    hideNotice();
+    tailorFor(biz.id, role);
+  });
+  n.appendChild(go);
+  const no = el("button", "clear-btn", "Dismiss");
+  no.addEventListener("click", hideNotice);
+  n.appendChild(no);
+  n.hidden = false;
+}
+
+function buildRoleSelect(grp) {
+  const sel = el("select", "mini");
+  sel.style.maxWidth = "58vw";
+  for (const [label, roles] of ROLE_GROUPS) {
+    const og = document.createElement("optgroup");
+    og.label = label;
+    for (const [role, pay] of roles) {
+      const o = document.createElement("option");
+      o.value = role;
+      o.textContent = pay ? role + "  (" + pay + ")" : role;
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
+  }
+  const cog = document.createElement("optgroup"); cog.label = "—";
+  const co = document.createElement("option"); co.value = "__custom__"; co.textContent = "✎ Type my own…";
+  cog.appendChild(co); sel.appendChild(cog);
+  const def = DEFAULT_ROLE_BY_GRP[grp];
+  if (def) sel.value = def;
+  sel.addEventListener("change", () => {
+    if (sel.value !== "__custom__") return;
+    const t = (prompt("What role?") || "").trim();
+    if (t) {
+      const o = document.createElement("option"); o.value = t; o.textContent = t; o.selected = true;
+      sel.insertBefore(o, sel.firstChild); sel.value = t;
+    } else { sel.value = def || sel.options[0].value; }
+  });
+  return sel;
+}
+
+async function tailorFor(id, role) {
   const biz = bizById(id);
   if (!biz) return;
   if (!WORKER_URL) {
@@ -1681,20 +1777,21 @@ async function tailorFor(id) {
   const saved = loadTailors()[id];
   if (saved && saved.fields) { activateTailor(id, saved); return; }
 
-  showNotice("Tailoring your resume for " + biz.name + "…", null, null, null, true);
+  const label = tailorLabel(biz.name, role);
+  showNotice("Tailoring your resume for " + label + "…", null, null, null, true);
   try {
     const res = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resume: doc, business: biz }),
+      body: JSON.stringify({ resume: doc, business: biz, role: role || "" }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const fields = await res.json();
     if (fields.error) throw new Error(fields.error);
-    activeTailor = { businessId: id, name: biz.name, business: biz, fields };
+    activeTailor = { businessId: id, name: biz.name, business: biz, role: role || "", fields };
     persistActiveTailor();
     setModeToggle();
-    showNotice("Tailored for " + biz.name + ".", "Clear", () => { clearTailor(); renderForm(); renderPreview(); });
+    showNotice("Tailored for " + label + ".", "Clear", () => { clearTailor(); renderForm(); renderPreview(); });
     renderForm(); renderPreview();
   } catch (e) {
     showNotice("Couldn't tailor just now (" + String(e.message || e).slice(0, 60) + "). Your resume is unchanged.");
@@ -1714,7 +1811,7 @@ document.getElementById("savedBtn").addEventListener("click", () => {
   for (const id of ids) {
     const entry = map[id];
     const row = el("div", "saved-row");
-    row.appendChild(el("div", "nm", (entry.business && entry.business.name) || entry.name || "Business"));
+    row.appendChild(el("div", "nm", tailorLabel((entry.business && entry.business.name) || entry.name || "Business", entry.role)));
     row.appendChild(el("div", "dt", new Date(entry.at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })));
     const open = el("button", "mini-btn", "Open");
     open.addEventListener("click", () => { hideNotice(); activateTailor(id, entry); });
@@ -1800,7 +1897,7 @@ function handleBizParam() {
   if (!biz) return;
   const saved = loadTailors()[id];
   if (saved && saved.fields) { activateTailor(id, saved); return; }
-  showNotice("Tailor this resume for " + biz.name + "?", "Tailor now", () => { hideNotice(); tailorFor(id); });
+  promptTailor(biz);
 }
 syncBaseline(hadLocal).then(handleBizParam, handleBizParam);
 
@@ -1817,6 +1914,8 @@ html = (HTML
         .replace("__TEMPLATE_OPTIONS__", TEMPLATE_OPTIONS)
         .replace("__WORKER_URL__", TAILOR_WORKER_URL)
         .replace("__BUSINESSES__", BUSINESSES_JSON)
+        .replace("__ROLE_GROUPS__", json.dumps(ROLE_GROUPS).replace("</", "<\\/"))
+        .replace("__DEFAULT_ROLE_BY_GRP__", json.dumps(DEFAULT_ROLE_BY_GRP))
         .replace("__FONT_IDS__", json.dumps(FONT_IDS))
         .replace("__TEMPLATE_IDS__", json.dumps(TEMPLATE_IDS))
         .replace("__DOCX_FONTS__", json.dumps(DOCX_FONTS)))
