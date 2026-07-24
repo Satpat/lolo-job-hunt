@@ -99,6 +99,15 @@ the directory for a business, pick the role, hit **Tailor now**. The
 **Tailor résumé** button on any card in the jobs directory deep-links here
 (`resume.html?biz=<place_id>`) and simply pre-aims that panel.
 
+The business field also takes **free text**: the directory only covers Bundoora
+and nearby PT-connected suburbs, and Google Places misses plenty besides, so
+whatever she types can be used verbatim (offered as *Use "…"* under the search
+results). A hand-typed business has no category or suburb to lean on, so an
+optional **"What kind of place is it?"** field appears to give the model
+something to aim at, and the Worker is told the rest is unknown rather than
+letting it assume. These save and re-open like directory ones, under an id of
+`custom:<name>`.
+
 - the **headline** and **summary** are rewritten to target that business, and
   experience items, skills, and bullets are **reordered** to surface the most
   relevant parts first;
@@ -150,6 +159,19 @@ Underline stub rule, and the Banner accent band. It stays **single-column for
 every template** (the Sidebar maps to the left-aligned look), because two-column
 DOCX parses badly in applicant tracking systems. See `DOCX_TEMPLATE` in
 `build_resume.py` for the per-template spec.
+
+Two OOXML tricks are worth knowing before editing that spec, since neither is
+obvious: the Underline template's **short** stub rule is a paragraph border on an
+empty paragraph *indented from the right* (a border spans the content box, so
+narrowing the box narrows the rule) — no table, which keeps it ATS-clean. The
+Banner band bleeds to the paper edge via **negative left/right indents** that
+cancel the page margins.
+
+> The Banner band starts at the **top margin** in Word, not the paper edge as it
+> does on screen. That gap is deliberate: the only ways to bleed past the top
+> margin are a first-page header — which hides her name and contact details from
+> many ATS, the classic resume-parsing own goal — or a zero-top-margin section,
+> which then wrecks the top of page 2. A thin white strip is the better trade.
 
 **What it borrows.** The document model and the page layout come from
 [Reactive Resume](https://github.com/amruthpillai/reactive-resume) (MIT) — the

@@ -1550,6 +1550,13 @@ function para(runs, o = {}) {
      box, so narrowing the box narrows the border. That is how the Underline
      template's stub rule is reproduced without a table. */
   if (o.barW) ppr.push('<w:ind w:right="' + Math.max(0, CONTENT_W - o.barW) + '"/>');
+  /* Negative indents cancel the page margins so paragraph shading reaches the
+     paper edge — how the Banner band is made to bleed like the preview does.
+     Word has no way to bleed past the TOP margin from the body, and the only
+     constructs that could (a first-page header, or a zero-margin section) either
+     hide the name from applicant tracking systems or wreck page 2, so the band
+     starts at the top margin. That strip is the one intentional difference. */
+  else if (o.bleed) ppr.push('<w:ind w:left="-' + MARGIN_X + '" w:right="-' + MARGIN_X + '"/>');
   else if (o.bullet) ppr.push('<w:ind w:left="284" w:hanging="284"/>');
   if (o.rule) ppr.push('<w:pBdr><w:bottom w:val="single" w:sz="' + (o.ruleSz || 6) +
     '" w:space="' + (o.ruleGap == null ? 2 : o.ruleGap) + '" w:color="' + o.rule + '"/></w:pBdr>');
@@ -1600,13 +1607,14 @@ function buildDocxBody() {
   const out = [];
 
   /* Header. The Banner template paints an accent band behind it: paragraph
-     shading plus white text, with zero-height shaded spacers top and bottom so
-     the block reads as one band rather than three striped lines. */
-  const bandPad = (o) => para("", { shd: accent, align: t.head, after: 0, before: 0, markSz: 8, ...o });
-  const hOpt = (o) => (t.band ? { align: t.head, shd: accent, ...o } : { align: t.head, ...o });
+     shading plus white text, bled past both page margins so it reaches the paper
+     edge like the preview, with short shaded spacers top and bottom so the block
+     reads as one band rather than three striped lines. */
+  const bandPad = (o) => para("", { shd: accent, align: t.head, bleed: true, after: 0, before: 0, markSz: 8, ...o });
+  const hOpt = (o) => (t.band ? { align: t.head, shd: accent, bleed: true, ...o } : { align: t.head, ...o });
   const hInk = t.band ? "FFFFFF" : null;
 
-  if (t.band) out.push(bandPad({ before: 60 }));
+  if (t.band) out.push(bandPad({ markSz: 16 }));
   out.push(para(run(d.basics.name || "Your name", { b: true, sz: t.name, color: hInk }),
     hOpt({ after: t.band ? 0 : 20 })));
   if ((d.basics.headline || "").trim()) {
@@ -1617,7 +1625,7 @@ function buildDocxBody() {
   for (const p of d.basics.profiles || []) if ((p.url || "").trim()) contacts.push((p.label ? p.label + ": " : "") + p.url);
   const cc = contacts.filter((c) => (c || "").trim());
   if (cc.length) out.push(para(run(cc.join("   ·   "), { sz: 19, color: hInk }), hOpt({ after: t.band ? 0 : 40 })));
-  if (t.band) { out.push(bandPad({ after: 0, markSz: 8 })); out.push(para("", { after: 0, markSz: 8 })); }
+  if (t.band) { out.push(bandPad({ markSz: 16 })); out.push(para("", { after: 0, markSz: 8 })); }
 
   /* Section heading. Underline swaps the full-width rule for a short accent bar;
      Minimal drops the rule entirely and widens the letter tracking instead. */
@@ -1917,9 +1925,11 @@ function tailorPayload() {
    what "Regenerate" does, and it is the whole point of the panel: the payload is
    built from `doc`, which the form mutates synchronously on every keystroke, so
    a regenerate always reflects the fields she just added on the left. */
-async function tailorFor(id, role, force) {
-  const biz = bizById(id);
+/* Takes the business OBJECT, not an id: a hand-typed business has no entry in
+   BUSINESSES to look up. */
+async function tailorFor(biz, role, force) {
   if (!biz || tailorBusy) return;
+  const id = biz.id;
   if (!WORKER_URL) { syncTailorPanel(); return; }
   if (!force) {
     const saved = loadTailors()[id];
@@ -1984,11 +1994,23 @@ function pickBusiness(b) {
   TP.hits.hidden = true;
   const saved = loadTailors()[b.id];
   setRoleSelect(b.grp, saved && saved.role);
+  TP.customType.value = (b.custom && (saved && saved.business && saved.business.cat)) || (b.custom ? b.cat || "" : "");
   syncTailorPanel();
 }
 
+/* Not every employer she wants is in the directory — it only covers Bundoora and
+   nearby suburbs, and Google Places misses plenty besides. So the search field
+   doubles as free text: whatever she types can be used as the business verbatim.
+   The id is derived from the name so a hand-typed business still saves and
+   re-opens like a directory one. */
+function customBusiness(name) {
+  const nm = name.trim();
+  return { id: "custom:" + nm.toLowerCase(), name: nm, cat: "", grp: "Other", suburb: "", custom: true };
+}
+
 function renderHits() {
-  const q = TP.input.value.trim().toLowerCase();
+  const raw = TP.input.value.trim();
+  const q = raw.toLowerCase();
   TP.hits.textContent = "";
   if (!q || (tailorPick && tailorPick.name.toLowerCase() === q)) { TP.hits.hidden = true; return; }
   const hits = [];
@@ -1996,17 +2018,21 @@ function renderHits() {
     if (b.name.toLowerCase().includes(q)) hits.push(b);
     if (hits.length >= 8) break;
   }
-  if (!hits.length) {
-    TP.hits.appendChild(el("div", "tailor-hint", "Nothing in the directory matches that."));
-    TP.hits.hidden = false;
-    return;
-  }
   for (const b of hits) {
     const btn = el("button", "biz-hit");
     btn.appendChild(el("span", null, b.name));
     const sub = join(" · ", b.cat, b.suburb);
     if (sub) btn.appendChild(el("span", "sub", sub));
     btn.addEventListener("click", () => pickBusiness(b));
+    TP.hits.appendChild(btn);
+  }
+  /* Always offer the typed text itself, so a business that isn't in the
+     directory — or isn't anywhere near Bundoora — is still tailorable. */
+  if (!hits.some((b) => b.name.toLowerCase() === q)) {
+    const btn = el("button", "biz-hit");
+    btn.appendChild(el("span", null, "Use “" + raw + "”"));
+    btn.appendChild(el("span", "sub", hits.length ? "not in the list" : "type it yourself"));
+    btn.addEventListener("click", () => pickBusiness(customBusiness(raw)));
     TP.hits.appendChild(btn);
   }
   TP.hits.hidden = false;
@@ -2074,6 +2100,7 @@ function syncTailorPanel() {
       : "Tailoring isn't set up yet — the AI helper still needs deploying.";
   }
 
+  TP.customWrap.hidden = !(tailorPick && tailorPick.custom);
   TP.go.disabled = !WORKER_URL || !tailorPick || tailorBusy;
   TP.go.textContent = tailorBusy ? "Working…" : (savedForPick ? "Regenerate" : "Tailor now");
   TP.go.title = savedForPick
@@ -2120,6 +2147,19 @@ function initTailorPanel() {
   search.appendChild(TP.hits);
   body.appendChild(search);
 
+  /* Only for hand-typed businesses: the directory supplies a category and suburb,
+     but free text supplies nothing, and the model tailors far better with a hint
+     than with a bare name. Optional — blank just means "unknown". */
+  TP.customWrap = el("div", "field");
+  TP.customWrap.appendChild(el("label", null, "What kind of place is it? (optional)"));
+  TP.customType = document.createElement("input");
+  TP.customType.type = "text";
+  TP.customType.placeholder = "Cafe, aged care, warehouse, tutoring…";
+  TP.customWrap.appendChild(TP.customType);
+  TP.customWrap.appendChild(el("div", "hint", "Not in the directory, so this is all the tailoring will know about it."));
+  TP.customWrap.hidden = true;
+  body.appendChild(TP.customWrap);
+
   const rf = el("div", "field");
   rf.appendChild(el("label", null, "Role you're after"));
   TP.roleSlot = el("div");
@@ -2130,7 +2170,10 @@ function initTailorPanel() {
   const row = el("div", "tailor-row");
   TP.go = el("button", "sheet-btn", "Tailor now");
   TP.go.addEventListener("click", () => {
-    if (tailorPick) tailorFor(tailorPick.id, currentRole(), true);
+    if (!tailorPick) return;
+    // Fold the free-text hint in as the category the Worker prompt reads.
+    if (tailorPick.custom) tailorPick.cat = TP.customType.value.trim();
+    tailorFor(tailorPick, currentRole(), true);
   });
   row.appendChild(TP.go);
   TP.open = el("button", "toggle-btn", "Open saved");
