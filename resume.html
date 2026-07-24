@@ -116,6 +116,8 @@ h1 {
 .toggle-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink-dim); }
 .toggle-btn[data-active="1"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .toggle-btn:disabled { opacity: 0.45; cursor: default; }
+/* These set display:flex, which outranks the UA's [hidden] { display: none }. */
+.sheet-btn[hidden], .toggle-btn[hidden] { display: none; }
 
 .view-toggle {
   display: none;
@@ -214,11 +216,20 @@ select.mini {
   background: var(--surface); margin-bottom: 12px; overflow: hidden;
 }
 .sec[data-hidden="1"] { opacity: 0.5; }
-.sec-head { display: flex; gap: 6px; align-items: center; padding: 10px 12px; }
-.sec-title {
-  font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
-  text-transform: uppercase; color: var(--ink-dim); flex: 1 1 auto; min-width: 0;
+/* Section headers carry the page's scanning rhythm, so they get a tinted bar, a
+   full-strength ink colour and an accent edge rather than the faint grey label
+   they used to be — ~3:1 against white before, ~12:1 now, in both themes. */
+.sec-head {
+  display: flex; gap: 6px; align-items: center; padding: 11px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
+.sec-title {
+  font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink); flex: 1 1 auto; min-width: 0;
+}
+.sec-head + .item, .sec-head + .add-row, .sec-head + .empty-note { border-top: 0; }
 .ico {
   width: 30px; height: 30px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono); font-size: 13px; line-height: 1;
@@ -235,9 +246,12 @@ select.mini {
 .item-bar { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px; }
 .field { margin-bottom: 9px; }
 .field:last-child { margin-bottom: 0; }
+/* --ink-faint on white is only ~3:1, under AA — field labels and hints are text
+   she has to read, so they step up to --ink-dim (~6.5:1). --ink-faint stays for
+   genuinely decorative chrome (the meta line, timestamps). */
 .field label {
-  display: block; font-family: var(--font-mono); font-size: 10px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 4px;
+  display: block; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px;
 }
 .field input, .field textarea {
   width: 100%; font: inherit; font-size: 14px; padding: 8px 10px;
@@ -248,7 +262,7 @@ select.mini {
 .field input:focus, .field textarea:focus {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.field .hint { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); margin-top: 4px; }
+.field .hint { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-dim); margin-top: 4px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
 
@@ -262,7 +276,7 @@ select.mini {
 }
 .empty-note {
   border-top: 1px solid var(--line-soft); padding: 14px 12px;
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint);
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim);
 }
 
 /* photo control */
@@ -280,9 +294,47 @@ select.mini {
 
 /* saved tailored versions list */
 .saved-list { display: flex; flex-direction: column; gap: 6px; }
+.saved-list[hidden] { display: none; }
 .saved-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
 .saved-row .nm { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.saved-row .dt { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); flex: 0 0 auto; }
+.saved-row .dt { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); flex: 0 0 auto; }
+.saved-row[data-active="1"] { border-color: var(--accent); background: var(--accent-soft); }
+
+/* ── the tailoring panel ─────────────────────────────────────────────────
+   Permanently docked at the top of the editor column (it used to be a notice
+   bar that vanished on Dismiss and was clobbered by every other message), so
+   re-tailoring is always one tap away and never has to be re-summoned. */
+#tailorPanel .sec { margin-bottom: 14px; }
+.tailor-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.tailor-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tailor-row > .grow { flex: 1 1 150px; min-width: 0; }
+.tailor-status {
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.45; color: var(--ink);
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  border-radius: var(--radius); padding: 8px 10px;
+}
+.tailor-status[data-idle="1"] { border-color: var(--line); background: var(--surface-2); color: var(--ink-dim); }
+.tailor-status b { font-weight: 700; }
+.tailor-hint { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-dim); }
+.biz-search { position: relative; }
+.biz-results {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 6px;
+  max-height: 190px; overflow-y: auto;
+}
+.biz-results[hidden] { display: none; }
+.biz-hit {
+  display: flex; gap: 8px; align-items: baseline; text-align: left; width: 100%;
+  font: inherit; font-size: 13px; padding: 7px 10px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); color: var(--ink);
+}
+.biz-hit .sub { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); margin-left: auto; flex: 0 0 auto; }
+@media (hover: hover) and (pointer: fine) {
+  .biz-hit:hover { border-color: var(--accent); }
+}
+.tailor-spin { display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--accent); border-top-color: transparent; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── the page ───────────────────────────────────────────────────────── */
 
@@ -323,10 +375,13 @@ select.mini {
 .rs-contact a { text-decoration: none; }
 .rs-sec { margin-bottom: 5mm; }
 .rs-sec:last-child { margin-bottom: 0; }
+/* Heavier weight and a 1pt rule (was 0.5pt, which some printers drop to a ghost
+   line): the headings anchor the page for a human skim-reader. Size is unchanged
+   on purpose — bumping it reflows a resume that is deliberately kept to one page. */
 .rs-sec > h2 {
-  font-size: 11pt; font-weight: 700; text-align: center; text-transform: uppercase;
+  font-size: 11pt; font-weight: 800; text-align: center; text-transform: uppercase;
   letter-spacing: 0.11em; margin: 0 0 2.5mm; padding-bottom: 1mm;
-  color: var(--doc-accent); border-bottom: 0.5pt solid var(--doc-accent);
+  color: var(--doc-accent); border-bottom: 1pt solid var(--doc-accent);
 }
 .rs-item { margin-bottom: 3.5mm; }
 .rs-item:last-child { margin-bottom: 0; }
@@ -445,6 +500,13 @@ footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
   body * { visibility: hidden; }
   #paper, #paper * { visibility: visible; }
   .controls, footer, header.top, .paper-meta, .pgguide { display: none !important; }
+  /* While printing, the layout viewport becomes the PAPER width (~794px), so the
+     900px "mobile" query below always matches — which used to hide .preview-col
+     whenever the Edit pane was active and print a blank page on every device.
+     Force the sheet back on, and drop the editor chrome so nothing reserves space. */
+  .form-col, #tailorPanel, .notice { display: none !important; }
+  .wrap { display: block !important; padding: 0 !important; }
+  .preview-col { display: block !important; }
   .preview-col, .paper-frame { position: static !important; overflow: visible !important; }
   .scaler { transform: none !important; width: auto !important; height: auto !important; }
   #paper { position: absolute; left: 0; top: 0; width: 210mm; }
@@ -514,7 +576,6 @@ footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
           <option value="custom">Custom&hellip;</option>
         </select>
         <input class="swatch" type="color" id="accentPick" title="Custom colour" value="#8e2a52" />
-        <button class="toggle-btn" id="savedBtn">Saved</button>
         <button class="toggle-btn" id="baselineBtn">Baseline</button>
         <button class="toggle-btn" id="saveJsonBtn">Back&nbsp;up</button>
         <button class="toggle-btn" id="loadJsonBtn">Restore</button>
@@ -527,6 +588,7 @@ footer a { color: var(--ink-dim); text-decoration-color: var(--line); }
 
 <div class="wrap">
   <div class="form-col">
+    <div id="tailorPanel"></div>
     <div class="notice" id="notice" hidden></div>
     <div id="form"></div>
   </div>
@@ -620,9 +682,18 @@ const SECTION_DEFS = {
       ph: "Weekday evenings from 5pm\nAll day Saturday and Sunday",
       hint: "Casual employers read this first. One line each." },
   ] },
+  references: { title: "References", add: "Add a referee",
+    empty: "Two referees is plenty — a manager, supervisor or teacher who has actually seen you work. Ask them first.",
+    fields: [
+      { k: "name", label: "Name", ph: "Priya Sharma", half: true },
+      { k: "role", label: "Their role", ph: "Café Manager", half: true },
+      { k: "company", label: "Where", ph: "Cafe on Grimshaw", half: true },
+      { k: "phone", label: "Phone", type: "tel", ph: "0400 000 000", half: true },
+      { k: "email", label: "Email (optional)", type: "email", ph: "priya@example.com", half: true },
+    ] },
 };
 
-const ORDER = ["summary", "experience", "education", "projects", "skills", "languages", "certifications", "availability"];
+const ORDER = ["summary", "experience", "education", "projects", "skills", "languages", "certifications", "availability", "references"];
 /* In the sidebar template, these go to the left column; the rest stay in main. */
 const SIDEBAR_SECTIONS = new Set(["skills", "languages", "certifications", "availability"]);
 
@@ -698,8 +769,15 @@ function adopt(raw) {
       });
     }
   }
-  if (Array.isArray(raw.order))
-    doc.order = ORDER.filter((id) => raw.order.includes(id)).sort((a, b) => raw.order.indexOf(a) - raw.order.indexOf(b));
+  /* Respect a saved section order, but APPEND any section the saved copy predates
+     (References was added later). Filtering alone would silently drop new sections
+     for everyone with an existing localStorage doc — they'd never see the feature. */
+  if (Array.isArray(raw.order)) {
+    const known = ORDER.filter((id) => raw.order.includes(id))
+      .sort((a, b) => raw.order.indexOf(a) - raw.order.indexOf(b));
+    for (const id of ORDER) if (!known.includes(id)) known.push(id);
+    doc.order = known;
+  }
 
   const fam = raw.metadata && raw.metadata.typography && raw.metadata.typography.body && raw.metadata.typography.body.fontFamily;
   if (FONT_IDS.includes(fam)) doc.metadata.typography.body.fontFamily = fam;
@@ -1080,6 +1158,19 @@ const ITEM_RENDER = {
     if ((it.issuer || "").trim()) box.appendChild(el("div", "rs-sub", it.issuer));
     return box;
   },
+  references: (it) => {
+    if (!has(it.name, it.role, it.company, it.phone, it.email)) return null;
+    const box = el("div", "rs-item");
+    box.appendChild(twoUp(it.name, it.phone));
+    const sub = join(" · ", it.role, it.company);
+    if (sub) box.appendChild(el("div", "rs-sub", sub));
+    if ((it.email || "").trim()) {
+      const p = el("p", "rs-line");
+      p.appendChild(linkNode(it.email, "mailto:" + it.email));
+      box.appendChild(p);
+    }
+    return box;
+  },
 };
 
 function linkNode(text, href) {
@@ -1331,41 +1422,95 @@ function run(text, o = {}) {
 function para(runs, o = {}) {
   const ppr = [];
   if (o.align) ppr.push('<w:jc w:val="' + o.align + '"/>');
-  if (o.rule) ppr.push('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="' + o.rule + '"/></w:pBdr>');
+  /* `rule` draws a full-width hairline; `barW` (twips) draws a SHORT accent bar by
+     indenting the paragraph from the right — a paragraph border spans the content
+     box, so narrowing the box narrows the border. That is how the Underline
+     template's stub rule is reproduced without a table. */
+  if (o.barW) ppr.push('<w:ind w:right="' + Math.max(0, CONTENT_W - o.barW) + '"/>');
+  else if (o.bullet) ppr.push('<w:ind w:left="284" w:hanging="284"/>');
+  if (o.rule) ppr.push('<w:pBdr><w:bottom w:val="single" w:sz="' + (o.ruleSz || 6) +
+    '" w:space="' + (o.ruleGap == null ? 2 : o.ruleGap) + '" w:color="' + o.rule + '"/></w:pBdr>');
+  if (o.shd) ppr.push('<w:shd w:val="clear" w:color="auto" w:fill="' + o.shd + '"/>');
   if (o.tabRight) ppr.push('<w:tabs><w:tab w:val="right" w:pos="' + CONTENT_W + '"/></w:tabs>');
-  if (o.bullet) ppr.push('<w:ind w:left="284" w:hanging="284"/>');
   const sp = [];
   if (o.before != null) sp.push('w:before="' + o.before + '"');
   if (o.after != null) sp.push('w:after="' + o.after + '"');
   if (sp.length) ppr.push("<w:spacing " + sp.join(" ") + "/>");
+  if (o.markSz) ppr.push('<w:rPr><w:sz w:val="' + o.markSz + '"/><w:szCs w:val="' + o.markSz + '"/></w:rPr>');
   return "<w:p>" + (ppr.length ? "<w:pPr>" + ppr.join("") + "</w:pPr>" : "") + runs + "</w:p>";
 }
 const bullet = (text, sz) => para(run("•\t" + text, { sz }), { bullet: true, after: 20 });
 const B = 21; // 10.5pt body, half-points
 
-/* Resume DOCX — always single-column, ATS-clean (no photo, no columns). */
+/* ── Word styling per template ───────────────────────────────────────────────
+   The Word export stays SINGLE-COLUMN for every template (two-column .docx
+   parses badly in applicant tracking systems), but it now mirrors the template
+   she actually picked and previewed: alignment, heading treatment, type sizes
+   and the banner's accent band. `sidebar` has no single-column equivalent, so it
+   maps to the left-aligned look — the closest honest match. */
+const DOCX_TEMPLATE = {
+  kakuna:    { head: "center", sec: "center", rule: true },
+  onyx:      { head: "left",   sec: "left",   rule: true },
+  underline: { head: "left",   sec: "left",   rule: false, bar: 680 },
+  minimal:   { head: "left",   sec: "left",   rule: false, track: 60, before: 260, after: 120 },
+  banner:    { head: "center", sec: "center", rule: true, band: true },
+  compact:   { head: "left",   sec: "left",   rule: true, body: 19, name: 34, secSz: 20,
+               before: 140, after: 60, itemGap: 90, tight: true },
+  sidebar:   { head: "left",   sec: "left",   rule: true },
+};
+function docxSpec(id) {
+  const t = DOCX_TEMPLATE[id] || DOCX_TEMPLATE.kakuna;
+  return {
+    head: t.head, sec: t.sec, rule: t.rule !== false, bar: t.bar || 0, band: !!t.band,
+    track: t.track || 22, body: t.body || B, name: t.name || 40, secSz: t.secSz || 22,
+    before: t.before == null ? 200 : t.before, after: t.after == null ? 100 : t.after,
+    itemGap: t.itemGap || 120, tight: !!t.tight,
+  };
+}
+
+/* Resume DOCX — always single-column and ATS-clean (no photo, no columns), but
+   styled to match the template selected in the toolbar. See DOCX_TEMPLATE. */
 function buildDocxBody() {
   const d = viewDoc();
   const accent = d.metadata.design.colors.primary.replace("#", "").toUpperCase();
+  const t = docxSpec(d.metadata.template || "kakuna");
   const out = [];
-  out.push(para(run(d.basics.name || "Your name", { b: true, sz: 40 }), { align: "center", after: 20 }));
-  if ((d.basics.headline || "").trim()) out.push(para(run(d.basics.headline, { sz: B }), { align: "center", after: 20 }));
+
+  /* Header. The Banner template paints an accent band behind it: paragraph
+     shading plus white text, with zero-height shaded spacers top and bottom so
+     the block reads as one band rather than three striped lines. */
+  const bandPad = (o) => para("", { shd: accent, align: t.head, after: 0, before: 0, markSz: 8, ...o });
+  const hOpt = (o) => (t.band ? { align: t.head, shd: accent, ...o } : { align: t.head, ...o });
+  const hInk = t.band ? "FFFFFF" : null;
+
+  if (t.band) out.push(bandPad({ before: 60 }));
+  out.push(para(run(d.basics.name || "Your name", { b: true, sz: t.name, color: hInk }),
+    hOpt({ after: t.band ? 0 : 20 })));
+  if ((d.basics.headline || "").trim()) {
+    out.push(para(run(d.basics.headline, { sz: t.body, color: hInk }), hOpt({ after: t.band ? 0 : 20 })));
+  }
   const contacts = [d.basics.email, d.basics.phone, d.basics.location];
   if (d.basics.website && d.basics.website.url) contacts.push(d.basics.website.url);
   for (const p of d.basics.profiles || []) if ((p.url || "").trim()) contacts.push((p.label ? p.label + ": " : "") + p.url);
   const cc = contacts.filter((c) => (c || "").trim());
-  if (cc.length) out.push(para(run(cc.join("   ·   "), { sz: 19 }), { align: "center", after: 40 }));
+  if (cc.length) out.push(para(run(cc.join("   ·   "), { sz: 19, color: hInk }), hOpt({ after: t.band ? 0 : 40 })));
+  if (t.band) { out.push(bandPad({ after: 0, markSz: 8 })); out.push(para("", { after: 0, markSz: 8 })); }
 
-  const heading = (t) => out.push(para(run(t, { b: true, sz: 22, color: accent, caps: true, spacing: 22 }),
-    { align: "center", rule: accent, before: 200, after: 100 }));
-  const titleDate = (title, date, gap) => {
-    const o = { after: 0, before: gap ? 120 : 0 };
-    if (!(date || "").trim()) return para(run(title, { b: true, sz: B }), o);
-    o.tabRight = true;
-    return para(run(title, { b: true, sz: B }) + "<w:r><w:tab/></w:r>" + run(date, { sz: 19 }), o);
+  /* Section heading. Underline swaps the full-width rule for a short accent bar;
+     Minimal drops the rule entirely and widens the letter tracking instead. */
+  const heading = (txt) => {
+    out.push(para(run(txt, { b: true, sz: t.secSz, color: accent, caps: true, spacing: t.track }),
+      { align: t.sec, rule: t.rule ? accent : null, before: t.before, after: t.bar ? 40 : t.after }));
+    if (t.bar) out.push(para("", { barW: t.bar, rule: accent, ruleSz: 12, ruleGap: 0, after: t.after, markSz: 8 }));
   };
-  const sub = (t) => out.push(para(run(t, { i: true, sz: 20 }), { after: 20 }));
-  const bullets = (text) => { for (const l of lines(text)) out.push(bullet(l, B)); };
+  const titleDate = (title, date, gap) => {
+    const o = { after: 0, before: gap ? t.itemGap : 0 };
+    if (!(date || "").trim()) return para(run(title, { b: true, sz: t.body }), o);
+    o.tabRight = true;
+    return para(run(title, { b: true, sz: t.body }) + "<w:r><w:tab/></w:r>" + run(date, { sz: 19 }), o);
+  };
+  const sub = (txt) => out.push(para(run(txt, { i: true, sz: t.tight ? 19 : 20 }), { after: t.tight ? 0 : 20 }));
+  const bullets = (text) => { for (const l of lines(text)) out.push(bullet(l, t.body)); };
 
   for (const id of d.order) {
     const def = SECTION_DEFS[id];
@@ -1375,7 +1520,7 @@ function buildDocxBody() {
       const ls = lines(data.content);
       if (!ls.length) continue;
       heading(data.title);
-      if (ls.length === 1) out.push(para(run(ls[0], { sz: B }), { after: 40 }));
+      if (ls.length === 1) out.push(para(run(ls[0], { sz: t.body }), { after: 40 }));
       else bullets(data.content);
       continue;
     }
@@ -1396,10 +1541,16 @@ function buildDocxBody() {
         out.push(titleDate(it.name, it.period, i)); bullets(it.description);
       } else if (id === "certifications") {
         out.push(titleDate(it.title, it.date, i)); if ((it.issuer || "").trim()) sub(it.issuer);
+      } else if (id === "references") {
+        /* Name (+ phone right-aligned), then role · where, then email — the same
+           three lines the preview draws, so the two exports agree. */
+        out.push(titleDate(it.name, it.phone, i));
+        const s = join(" · ", it.role, it.company); if (s) sub(s);
+        if ((it.email || "").trim()) out.push(para(run(it.email, { sz: 19 }), { after: 20 }));
       } else if (id === "skills") {
-        out.push(para(run(it.name + (it.keywords.trim() ? ": " : ""), { b: true, sz: B }) + run(it.keywords, { sz: B }), { after: 30 }));
+        out.push(para(run(it.name + (it.keywords.trim() ? ": " : ""), { b: true, sz: t.body }) + run(it.keywords, { sz: t.body }), { after: 30 }));
       } else if (id === "languages") {
-        out.push(para(run(it.language + (it.fluency.trim() ? ": " : ""), { b: true, sz: B }) + run(it.fluency, { sz: B }), { after: 30 }));
+        out.push(para(run(it.language + (it.fluency.trim() ? ": " : ""), { b: true, sz: t.body }) + run(it.fluency, { sz: t.body }), { after: 30 }));
       }
     });
   }
@@ -1566,9 +1717,11 @@ document.getElementById("baselineBtn").addEventListener("click", async () => {
    Tailoring UI
    ══════════════════════════════════════════════════════════════════════ */
 
-/* Tailoring is started from the jobs directory (each card's "Tailor résumé"
-   button deep-links here as resume.html?biz=<id>) and re-opened via "Saved" —
-   there is no business picker in this toolbar on purpose. */
+/* The tailoring controls live in a PERMANENT panel at the top of the editor
+   column (#tailorPanel). They used to be a notice bar that disappeared on
+   Dismiss and was overwritten by any other message, so re-tailoring meant
+   reloading the deep link. The panel is always there, always aimed at a
+   business, and "Regenerate" re-runs against the live form contents. */
 function bizById(id) { return BUSINESSES.find((b) => b.id === id) || null; }
 
 function setModeToggle() {
@@ -1579,7 +1732,7 @@ function setModeToggle() {
 }
 function clearTailor() {
   activeTailor = null; mode = "resume";
-  setModeToggle();
+  setModeToggle(); syncTailorPanel();
 }
 const tailorLabel = (name, role) => name + ((role || "").trim() ? " · " + role : "");
 
@@ -1587,35 +1740,13 @@ function activateTailor(id, entry) {
   const biz = (entry && entry.business) || bizById(id);
   activeTailor = { businessId: id, name: (biz && biz.name) || "Business", business: biz, role: entry.role || "", fields: entry.fields };
   setModeToggle();
-  showNotice("Tailored for " + tailorLabel(activeTailor.name, activeTailor.role) + ".", "Clear",
-    () => { clearTailor(); renderForm(); renderPreview(); });
-  renderForm(); renderPreview();
-}
-
-/* A role picker in the notice bar: choose which job she wants at this business,
-   then tailor. Started from a jobs-card deep link (resume.html?biz=<id>). */
-function promptTailor(biz) {
-  const n = document.getElementById("notice");
-  n.className = "notice"; n.textContent = "";
-  n.appendChild(el("span", null, "Tailor for " + biz.name + " — role:"));
-  const sel = buildRoleSelect(biz.grp);
-  n.appendChild(sel);
-  const go = el("button", "clear-btn", "Tailor now");
-  go.addEventListener("click", () => {
-    const role = sel.value === "__custom__" ? "" : sel.value;
-    hideNotice();
-    tailorFor(biz.id, role);
-  });
-  n.appendChild(go);
-  const no = el("button", "clear-btn", "Dismiss");
-  no.addEventListener("click", hideNotice);
-  n.appendChild(no);
-  n.hidden = false;
+  renderForm(); renderPreview(); syncTailorPanel();
 }
 
 function buildRoleSelect(grp) {
   const sel = el("select", "mini");
-  sel.style.maxWidth = "58vw";
+  sel.style.maxWidth = "100%";
+  sel.style.width = "100%";
   for (const [label, roles] of ROLE_GROUPS) {
     const og = document.createElement("optgroup");
     og.label = label;
@@ -1643,24 +1774,42 @@ function buildRoleSelect(grp) {
   return sel;
 }
 
-async function tailorFor(id, role) {
-  const biz = bizById(id);
-  if (!biz) return;
-  if (!WORKER_URL) {
-    showNotice("Tailoring isn't set up yet — the AI helper still needs deploying.");
-    return;
-  }
-  // Re-open a saved version instead of spending another call.
-  const saved = loadTailors()[id];
-  if (saved && saved.fields) { activateTailor(id, saved); return; }
+/* What actually gets POSTed. The model may only reorder experience/skills and
+   rewrite the headline/summary, so two things are stripped before the resume
+   leaves the device:
+     · references — a referee's phone and email are a THIRD PARTY's contact
+       details, and they never consented to an AI vendor holding them;
+     · picture    — a base64 photo the model cannot read anyway, and easily the
+       largest thing in the payload.
+   Neither is used for tailoring, so removing them costs nothing. */
+function tailorPayload() {
+  const p = clone(doc);
+  if (p.sections) delete p.sections.references;
+  p.order = (p.order || []).filter((id) => id !== "references");
+  p.picture = { url: "", show: false };
+  return p;
+}
 
-  const label = tailorLabel(biz.name, role);
-  showNotice("Tailoring your resume for " + label + "…", null, null, null, true);
+/* `force` skips the saved-version shortcut and spends a fresh API call. That is
+   what "Regenerate" does, and it is the whole point of the panel: the payload is
+   built from `doc`, which the form mutates synchronously on every keystroke, so
+   a regenerate always reflects the fields she just added on the left. */
+async function tailorFor(id, role, force) {
+  const biz = bizById(id);
+  if (!biz || tailorBusy) return;
+  if (!WORKER_URL) { syncTailorPanel(); return; }
+  if (!force) {
+    const saved = loadTailors()[id];
+    if (saved && saved.fields) { activateTailor(id, saved); return; }
+  }
+
+  hideNotice();
+  tailorBusy = true; syncTailorPanel();
   try {
     const res = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resume: doc, business: biz, role: role || "" }),
+      body: JSON.stringify({ resume: tailorPayload(), business: biz, role: role || "" }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const fields = await res.json();
@@ -1668,43 +1817,219 @@ async function tailorFor(id, role) {
     activeTailor = { businessId: id, name: biz.name, business: biz, role: role || "", fields };
     persistActiveTailor();
     setModeToggle();
-    showNotice("Tailored for " + label + ".", "Clear", () => { clearTailor(); renderForm(); renderPreview(); });
     renderForm(); renderPreview();
   } catch (e) {
     showNotice("Couldn't tailor just now (" + String(e.message || e).slice(0, 60) + "). Your resume is unchanged.");
+  } finally {
+    tailorBusy = false; syncTailorPanel();
   }
 }
 
-/* Saved tailored versions */
-document.getElementById("savedBtn").addEventListener("click", () => {
+/* ── the panel ───────────────────────────────────────────────────────────
+   Built once at boot; syncTailorPanel() then updates labels/state in place so
+   typing in the business search never loses focus. `tailorPick` (what the panel
+   is aimed at) is deliberately separate from `activeTailor` (what is applied) —
+   she can line up the next business without dropping the current tailoring. */
+let tailorPick = null;
+let tailorBusy = false;
+let savedOpen = false;
+const TP = {};
+
+function currentRole() {
+  const v = TP.role ? TP.role.value : "";
+  return v === "__custom__" ? "" : v;
+}
+function selectRole(sel, role) {
+  if (!sel || !(role || "").trim()) return;
+  if (![...sel.options].some((o) => o.value === role)) {
+    const o = document.createElement("option");
+    o.value = role; o.textContent = role;
+    sel.insertBefore(o, sel.firstChild);
+  }
+  sel.value = role;
+}
+function setRoleSelect(grp, preset) {
+  TP.roleSlot.textContent = "";
+  TP.role = buildRoleSelect(grp);
+  TP.roleSlot.appendChild(TP.role);
+  selectRole(TP.role, preset);
+}
+
+function pickBusiness(b) {
+  tailorPick = b;
+  TP.input.value = b.name;
+  TP.hits.hidden = true;
+  const saved = loadTailors()[b.id];
+  setRoleSelect(b.grp, saved && saved.role);
+  syncTailorPanel();
+}
+
+function renderHits() {
+  const q = TP.input.value.trim().toLowerCase();
+  TP.hits.textContent = "";
+  if (!q || (tailorPick && tailorPick.name.toLowerCase() === q)) { TP.hits.hidden = true; return; }
+  const hits = [];
+  for (const b of BUSINESSES) {
+    if (b.name.toLowerCase().includes(q)) hits.push(b);
+    if (hits.length >= 8) break;
+  }
+  if (!hits.length) {
+    TP.hits.appendChild(el("div", "tailor-hint", "Nothing in the directory matches that."));
+    TP.hits.hidden = false;
+    return;
+  }
+  for (const b of hits) {
+    const btn = el("button", "biz-hit");
+    btn.appendChild(el("span", null, b.name));
+    const sub = join(" · ", b.cat, b.suburb);
+    if (sub) btn.appendChild(el("span", "sub", sub));
+    btn.addEventListener("click", () => pickBusiness(b));
+    TP.hits.appendChild(btn);
+  }
+  TP.hits.hidden = false;
+}
+
+function renderSavedList() {
+  TP.savedWrap.textContent = "";
+  if (!savedOpen) { TP.savedWrap.hidden = true; return; }
   const map = loadTailors();
   const ids = Object.keys(map).sort((a, z) => map[z].at - map[a].at);
-  const n = document.getElementById("notice");
-  n.className = "notice"; n.textContent = "";
-  if (!ids.length) { n.appendChild(el("span", null, "No saved tailored versions yet — tailor for a business to make one.")); n.hidden = false; return; }
-  const wrap = el("div"); wrap.style.width = "100%";
-  wrap.appendChild(el("span", null, "Saved tailored versions:"));
-  const list = el("div", "saved-list"); list.style.marginTop = "8px";
+  if (!ids.length) {
+    TP.savedWrap.appendChild(el("div", "tailor-hint", "No saved versions yet — tailor for a business to make one."));
+    TP.savedWrap.hidden = false;
+    return;
+  }
   for (const id of ids) {
     const entry = map[id];
     const row = el("div", "saved-row");
+    if (activeTailor && activeTailor.businessId === id) row.dataset.active = "1";
     row.appendChild(el("div", "nm", tailorLabel((entry.business && entry.business.name) || entry.name || "Business", entry.role)));
     row.appendChild(el("div", "dt", new Date(entry.at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })));
     const open = el("button", "mini-btn", "Open");
-    open.addEventListener("click", () => { hideNotice(); activateTailor(id, entry); });
+    open.addEventListener("click", () => {
+      const biz = entry.business || bizById(id);
+      if (biz) pickBusiness(biz);
+      activateTailor(id, entry);
+    });
     row.appendChild(open);
     const del = el("button", "mini-btn", "✕");
+    del.title = "Delete this saved version";
     del.addEventListener("click", () => {
       const m = loadTailors(); delete m[id]; saveTailors(m);
       if (activeTailor && activeTailor.businessId === id) { clearTailor(); renderForm(); renderPreview(); }
-      document.getElementById("savedBtn").click();
+      syncTailorPanel();
     });
     row.appendChild(del);
-    list.appendChild(row);
+    TP.savedWrap.appendChild(row);
   }
-  wrap.appendChild(list);
-  n.appendChild(wrap); n.hidden = false;
-});
+  TP.savedWrap.hidden = false;
+}
+
+function syncTailorPanel() {
+  if (!TP.status) return;                     // panel not built yet (early boot)
+  const map = loadTailors();
+  const count = Object.keys(map).length;
+  const savedForPick = tailorPick ? map[tailorPick.id] : null;
+  const isActivePick = !!(tailorPick && activeTailor && activeTailor.businessId === tailorPick.id);
+
+  TP.savedBtn.textContent = count ? "Saved · " + count : "Saved";
+
+  TP.status.textContent = "";
+  if (tailorBusy) {
+    TP.status.dataset.idle = "0";
+    TP.status.appendChild(el("span", "tailor-spin"));
+    TP.status.appendChild(document.createTextNode(
+      "  Tailoring for " + tailorLabel(tailorPick ? tailorPick.name : "…", currentRole()) + " — 15–30 seconds."));
+  } else if (activeTailor) {
+    TP.status.dataset.idle = "0";
+    TP.status.appendChild(el("b", null, "Applied: " + tailorLabel(activeTailor.name, activeTailor.role)));
+    TP.status.appendChild(el("div", null, "Your saved resume is untouched — Clear removes this layer."));
+  } else {
+    TP.status.dataset.idle = "1";
+    TP.status.textContent = WORKER_URL
+      ? "Showing your base resume. Pick a business to tailor it."
+      : "Tailoring isn't set up yet — the AI helper still needs deploying.";
+  }
+
+  TP.go.disabled = !WORKER_URL || !tailorPick || tailorBusy;
+  TP.go.textContent = tailorBusy ? "Working…" : (savedForPick ? "Regenerate" : "Tailor now");
+  TP.go.title = savedForPick
+    ? "Spend a fresh call, using what's in the form right now"
+    : "Tailor this resume for the selected business";
+
+  TP.open.hidden = !(savedForPick && !isActivePick) || tailorBusy;
+  TP.clear.disabled = !activeTailor || tailorBusy;
+
+  renderSavedList();
+}
+
+function initTailorPanel() {
+  const root = document.getElementById("tailorPanel");
+  root.textContent = "";
+  const sec = el("div", "sec");
+
+  const head = el("div", "sec-head");
+  head.appendChild(el("div", "sec-title", "Tailor"));
+  TP.savedBtn = el("button", "mini-btn", "Saved");
+  TP.savedBtn.addEventListener("click", () => { savedOpen = !savedOpen; syncTailorPanel(); });
+  head.appendChild(TP.savedBtn);
+  sec.appendChild(head);
+
+  const body = el("div", "tailor-body");
+  TP.status = el("div", "tailor-status");
+  body.appendChild(TP.status);
+  TP.savedWrap = el("div", "saved-list");
+  TP.savedWrap.hidden = true;
+  body.appendChild(TP.savedWrap);
+
+  const search = el("div", "biz-search");
+  const bf = el("div", "field");
+  bf.appendChild(el("label", null, "Business"));
+  TP.input = document.createElement("input");
+  TP.input.type = "text";
+  TP.input.placeholder = "Search the directory…";
+  TP.input.addEventListener("input", () => { tailorPick = null; renderHits(); syncTailorPanel(); });
+  TP.input.addEventListener("focus", renderHits);
+  bf.appendChild(TP.input);
+  search.appendChild(bf);
+  TP.hits = el("div", "biz-results");
+  TP.hits.hidden = true;
+  search.appendChild(TP.hits);
+  body.appendChild(search);
+
+  const rf = el("div", "field");
+  rf.appendChild(el("label", null, "Role you're after"));
+  TP.roleSlot = el("div");
+  rf.appendChild(TP.roleSlot);
+  body.appendChild(rf);
+  setRoleSelect(null);
+
+  const row = el("div", "tailor-row");
+  TP.go = el("button", "sheet-btn", "Tailor now");
+  TP.go.addEventListener("click", () => {
+    if (tailorPick) tailorFor(tailorPick.id, currentRole(), true);
+  });
+  row.appendChild(TP.go);
+  TP.open = el("button", "toggle-btn", "Open saved");
+  TP.open.title = "Re-apply the saved version without spending another call";
+  TP.open.addEventListener("click", () => {
+    if (!tailorPick) return;
+    const entry = loadTailors()[tailorPick.id];
+    if (entry && entry.fields) activateTailor(tailorPick.id, entry);
+  });
+  row.appendChild(TP.open);
+  TP.clear = el("button", "toggle-btn", "Clear");
+  TP.clear.addEventListener("click", () => { clearTailor(); renderForm(); renderPreview(); });
+  row.appendChild(TP.clear);
+  body.appendChild(row);
+
+  body.appendChild(el("div", "tailor-hint",
+    "Regenerate reads the form as it is right now — add or edit anything on the left first, then run it again."));
+
+  sec.appendChild(body);
+  root.appendChild(sec);
+  syncTailorPanel();
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    Theming controls
@@ -1760,21 +2085,22 @@ window.addEventListener("resize", fitPaper);
 const hadLocal = load();
 syncControls();
 setModeToggle();
+initTailorPanel();
 renderForm();
 renderPreview();
 document.getElementById("savedAt").textContent = "";
 
-/* Deep link from a business card: resume.html?biz=<place_id> pre-selects it.
-   Runs AFTER baseline sync settles — applyBaseline() calls hideNotice(), so a
-   prompt shown before it would be wiped on a fresh device. */
+/* Deep link from a business card: resume.html?biz=<place_id> aims the panel at
+   that business (and re-applies a saved version if there is one). Runs AFTER the
+   baseline sync settles so a fresh device has her real resume to tailor from. */
 function handleBizParam() {
   const id = new URLSearchParams(location.search).get("biz");
   if (!id) return;
   const biz = bizById(id);
   if (!biz) return;
+  pickBusiness(biz);
   const saved = loadTailors()[id];
-  if (saved && saved.fields) { activateTailor(id, saved); return; }
-  promptTailor(biz);
+  if (saved && saved.fields) activateTailor(id, saved);
 }
 syncBaseline(hadLocal).then(handleBizParam, handleBizParam);
 

@@ -88,7 +88,9 @@ directly into `index.html`** and adds the UI, a Google Maps view, and the
 ### 2. The resume builder (`resume.html`)
 
 **What:** A two-pane editor — form on the left, live A4 preview on the right —
-with 4 templates, fonts, colours, an optional photo, and PDF / Word / JSON export.
+with 7 templates, fonts, colours, an optional photo, a References section, and
+PDF / Word / JSON export. Tailoring sits in a permanent panel at the top of the
+form column, with a **Regenerate** that re-runs against the live form contents.
 
 **How:** `build_resume.py` generates `resume.html` as a **single self-contained
 file**. In the browser:

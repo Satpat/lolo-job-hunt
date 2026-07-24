@@ -86,16 +86,18 @@ python3 build_resume.py   # writes resume.html (tailoring off until the Worker U
 ```
 
 `resume.html` is a self-contained resume editor: fill in the form on the left,
-watch an A4 page render on the right, then export. It has **four templates**
-(Centered, Left, Compact, and a two-column Sidebar), a curated set of fonts and
-accent colours (plus a custom-colour picker), an optional profile photo, and a
-**Links** section for LinkedIn/portfolio.
+watch an A4 page render on the right, then export. It has **seven templates**
+(Centered, Left, Underline, Minimal, Banner, Compact, and a two-column Sidebar),
+a curated set of fonts and accent colours (plus a custom-colour picker), an
+optional profile photo, a **Links** section for LinkedIn/portfolio, and a
+**References** section (referee name, role, where they work, phone, email).
 
 ### Business-aware tailoring (the AI feature)
 
-Pick a business — from the **Tailor for a business…** dropdown, or via the
-**Tailor résumé** button on any card in the jobs directory (which deep-links to
-`resume.html?biz=<place_id>`) — and the resume is re-tailored to it:
+Tailoring lives in a **permanent panel** at the top of the editor column — search
+the directory for a business, pick the role, hit **Tailor now**. The
+**Tailor résumé** button on any card in the jobs directory deep-links here
+(`resume.html?biz=<place_id>`) and simply pre-aims that panel.
 
 - the **headline** and **summary** are rewritten to target that business, and
   experience items, skills, and bullets are **reordered** to surface the most
@@ -104,8 +106,13 @@ Pick a business — from the **Tailor for a business…** dropdown, or via the
   and exportable on its own;
 - it's all **non-destructive** — the base resume in `localStorage` is never
   changed; tailoring is a separate layer you can **Clear**;
-- each tailored version is **saved** (under `lolo_resume_tailors`) so you can
-  re-open past ones from **Saved** without spending another API call.
+- each tailored version is **saved** (under `lolo_resume_tailors`); **Open saved**
+  re-applies one without spending another API call;
+- **Regenerate** spends a fresh call using **whatever is in the form right now** —
+  so the loop is: add a certificate or a referee on the left, hit Regenerate, and
+  the tailored copy accounts for it. (The panel is always on screen precisely so
+  that loop doesn't require reloading a deep link, which is what the old
+  dismissible notice bar forced.)
 
 **Truthfulness is enforced, not hoped for.** The model may only rewrite the two
 header fields and *reorder* existing content — it returns item ids and bullet
@@ -129,9 +136,20 @@ default. Everything else stays on the device. The photo, if added, is downscaled
 in-browser and stored as a data URI — it goes on the PDF but never the Word file
 (ATS-clean), and Australian employers generally don't expect one.
 
-**Templates & ATS.** All four templates print to PDF; the **Word export is always
-single-column** regardless of template, because two-column DOCX parses badly in
-applicant tracking systems.
+Two things are **stripped from the tailoring payload** before it leaves the
+browser (`tailorPayload()` in `build_resume.py`): the **References** section and
+the **photo**. Referees' phone numbers and emails belong to *other people* who
+never agreed to an AI vendor holding them, and the photo is a large base64 blob
+the model can't read. Neither is used for tailoring, so dropping them costs
+nothing. Anything else added to the document model that carries a third party's
+contact details should be stripped there too.
+
+**Templates & ATS.** All seven templates print to PDF, and the **Word export now
+matches the template you picked** — alignment, heading treatment, type sizes, the
+Underline stub rule, and the Banner accent band. It stays **single-column for
+every template** (the Sidebar maps to the left-aligned look), because two-column
+DOCX parses badly in applicant tracking systems. See `DOCX_TEMPLATE` in
+`build_resume.py` for the per-template spec.
 
 **What it borrows.** The document model and the page layout come from
 [Reactive Resume](https://github.com/amruthpillai/reactive-resume) (MIT) — the
@@ -154,6 +172,19 @@ recognises, so moving to the real app later needs no retyping.
   (stored entries, hand-rolled CRC32). No bundler and no CDN, which is what lets
   the page keep working offline from the Home Screen.
 - **Back up / Restore** read and write the whole document as JSON.
+
+> ⚠️ **The print-viewport trap.** While a page is printing, the browser sets the
+> layout viewport to the **paper width (~794px)**, not the window width. Every
+> `@media (max-width: …)` breakpoint above that therefore matches *during
+> printing on every device, desktop included*. This once made the PDF come out
+> **completely blank**: the responsive rule `body[data-pane="edit"]
+> .preview-col { display: none }` fired mid-print and hid the very element the
+> print stylesheet was trying to show. The `@media print` block now forces
+> `.preview-col` back to `display: block` and hides the editor column outright.
+> If you add a responsive rule that hides anything inside `#paper`'s ancestry,
+> override it in the print block too — and verify with
+> `chrome --headless --print-to-pdf`, not just Preview mode, because the bug is
+> invisible unless the Preview pane happens to be the active one.
 
 **The baseline.** `resume.baseline.json` is Lolo's starting resume, committed
 next to the page and transcribed from her existing ATS resume. The editor
