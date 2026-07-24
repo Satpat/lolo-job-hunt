@@ -374,7 +374,7 @@ select#sortSel {{
   flex-direction: column;
   gap: 8px;
 }}
-.card[data-applied="1"] {{ opacity: 0.5; }}
+.card[data-viewed="1"] {{ opacity: 0.5; }}
 .card-top {{ display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }}
 .card-name {{
   flex: 1;
@@ -393,28 +393,6 @@ select#sortSel {{
   padding-top: 2px;
 }}
 
-.applied-btn {{
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}}
-.applied-btn svg {{ width: 13px; height: 13px; }}
-.applied-btn[aria-pressed="true"] {{
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}}
-.applied-btn:hover {{ border-color: var(--accent); }}
-.applied-btn:focus-visible {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
 .tag-row {{ display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }}
 .tag {{
   font-family: var(--font-mono);
@@ -640,11 +618,6 @@ a {{ color: inherit; }}
   #search, #lockInput {{ font-size: 16px; }}
 }}
 
-/* Bigger tap target on the applied-check control (was 26px, under Apple's
-   44pt guidance for anything routinely tapped) */
-.applied-btn {{ width: 32px; height: 32px; }}
-.applied-btn svg {{ width: 15px; height: 15px; }}
-
 /* MacBook / wide desktop: use the extra width instead of leaving it as
    dead gutters either side of a centered 1080px column */
 @media (min-width: 1400px) {{
@@ -665,11 +638,11 @@ a {{ color: inherit; }}
   #search:hover {{ border-color: var(--ink-faint); }}
 }}
 
-/* Select-for-export checkbox — square, not the round applied-status
-   control, so the two don't read as the same action */
-.select-box {{ position: relative; flex: 0 0 auto; width: 22px; height: 22px; margin-top: 2px; cursor: pointer; }}
-.select-box input {{ position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }}
-.select-mark {{
+/* Viewed checkbox — square, single control per card. Checking it dims the
+   card and persists (localStorage), and also feeds the bulk-copy list. */
+.viewed-box {{ position: relative; flex: 0 0 auto; width: 24px; height: 24px; margin-top: 1px; cursor: pointer; }}
+.viewed-box input {{ position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }}
+.viewed-mark {{
   position: absolute;
   inset: 0;
   border: 1px solid var(--line);
@@ -679,8 +652,8 @@ a {{ color: inherit; }}
   align-items: center;
   justify-content: center;
 }}
-.select-box input:checked + .select-mark {{ background: var(--accent); border-color: var(--accent); }}
-.select-box input:checked + .select-mark::after {{
+.viewed-box input:checked + .viewed-mark {{ background: var(--accent); border-color: var(--accent); }}
+.viewed-box input:checked + .viewed-mark::after {{
   content: "";
   width: 9px;
   height: 5px;
@@ -689,8 +662,7 @@ a {{ color: inherit; }}
   border-bottom: 2px solid var(--accent-ink);
   transform: rotate(-45deg);
 }}
-.select-box input:focus-visible + .select-mark {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
-.card[data-selected="1"] {{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }}
+.viewed-box input:focus-visible + .viewed-mark {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
 
 /* Per-business note toggle + box */
 .btn.note-btn.has-note {{ border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }}
@@ -776,7 +748,7 @@ a {{ color: inherit; }}
         <button class="view-btn" data-view="map" data-active="0">Map</button>
       </div>
       <a class="sheet-btn" href="{SHEET_URL}" target="_blank" rel="noopener">Sheet</a>
-      <button id="appliedOnlyBtn" class="chip" data-active="0">Applied only</button>
+      <button id="viewedOnlyBtn" class="chip" data-active="0">Viewed only</button>
     </div>
     <div class="chip-row-wrap"><div class="chip-row" id="groupChips"></div></div>
     <div class="chip-row-wrap"><div class="chip-row" id="suburbChips"></div></div>
@@ -786,7 +758,6 @@ a {{ color: inherit; }}
 <div class="wrap">
   <div class="count-row">
     <span id="countLabel"></span>
-    <span id="appliedLabel"></span>
   </div>
   <div class="grid" id="grid"></div>
   <div class="load-more-row" id="loadMoreRow" style="display:none">
@@ -815,7 +786,6 @@ a {{ color: inherit; }}
 <div class="export-bar" id="exportBar" style="display:none">
   <span id="exportCount"></span>
   <button id="exportCopyBtn" class="btn primary">Copy</button>
-  <button id="exportClearBtn" class="btn">Clear</button>
 </div>
 
 <footer>
@@ -856,10 +826,30 @@ const CAT_HEX = {CAT_HEX_JSON};
 const ACCENT_HEX = "{ACCENT_HEX}";
 const REF = {{ lat: -37.7000101, lng: 145.0615908 }};
 
-const state = {{ q: "", group: "All", suburb: "All", sort: "dist", visible: 40, view: "list", appliedOnly: false }};
+const state = {{ q: "", group: "All", suburb: "All", sort: "dist", visible: 40, view: "list", viewedOnly: false }};
 const PAGE = 40;
-const applied = new Set(JSON.parse(localStorage.getItem("bundoora_applied") || "[]"));
-const selected = new Set();
+
+/* "viewed" replaces the old separate "applied" (status/dimming) and
+   "selected" (export) concepts with one persisted checkbox per card.
+   One-time migration: anyone who already marked businesses "applied" on
+   the live site keeps that progress instead of it silently resetting. */
+const VIEWED_KEY = "bundoora_viewed";
+const LEGACY_APPLIED_KEY = "bundoora_applied";
+let viewedSeed = localStorage.getItem(VIEWED_KEY);
+if (viewedSeed === null) {{
+  viewedSeed = localStorage.getItem(LEGACY_APPLIED_KEY) || "[]";
+}}
+const viewed = new Set(JSON.parse(viewedSeed));
+function saveViewed() {{
+  localStorage.setItem(VIEWED_KEY, JSON.stringify([...viewed]));
+}}
+function setViewed(id, isViewed) {{
+  if (isViewed) viewed.add(id);
+  else viewed.delete(id);
+  saveViewed();
+  updateExportBar();
+}}
+
 const notes = JSON.parse(localStorage.getItem("bundoora_notes") || "{{}}");
 function saveNotes() {{
   localStorage.setItem("bundoora_notes", JSON.stringify(notes));
@@ -884,18 +874,6 @@ const CHEER_LINES = [
 function pickCheer() {{
   const el = document.getElementById("cheerLine");
   if (el) el.innerHTML = CHEER_LINES[Math.floor(Math.random() * CHEER_LINES.length)];
-}}
-
-function encouragementFor(n) {{
-  if (n === 0) return "no applications yet &mdash; let's find your first &#10024;";
-  if (n < 3) return `${{n}} sent &mdash; great start!`;
-  if (n < 6) return `${{n}} sent &mdash; you're on a roll &#128293;`;
-  if (n < 10) return `${{n}} sent &mdash; go get 'em!`;
-  return `${{n}} sent &mdash; unstoppable &#127881;`;
-}}
-
-function saveApplied() {{
-  localStorage.setItem("bundoora_applied", JSON.stringify([...applied]));
 }}
 
 function groupCounts() {{
@@ -955,7 +933,7 @@ function filtered() {{
   let rows = DATA;
   if (state.group !== "All") rows = rows.filter((d) => d.grp === state.group);
   if (state.suburb !== "All") rows = rows.filter((d) => d.suburb === state.suburb);
-  if (state.appliedOnly) rows = rows.filter((d) => applied.has(d.id));
+  if (state.viewedOnly) rows = rows.filter((d) => viewed.has(d.id));
   if (state.q) {{
     const q = state.q.toLowerCase();
     rows = rows.filter((d) => d.name.toLowerCase().includes(q));
@@ -972,7 +950,7 @@ function filtered() {{
 }}
 
 function hasActiveFilters() {{
-  return state.group !== "All" || state.suburb !== "All" || !!state.q || state.appliedOnly;
+  return state.group !== "All" || state.suburb !== "All" || !!state.q || state.viewedOnly;
 }}
 function clearFiltersBtnHtml() {{
   return hasActiveFilters() ? ` <button id="clearFiltersBtn" class="clear-btn">clear filters</button>` : "";
@@ -984,10 +962,10 @@ function wireClearFilters() {{
     state.group = "All";
     state.suburb = "All";
     state.q = "";
-    state.appliedOnly = false;
+    state.viewedOnly = false;
     state.visible = PAGE;
     document.getElementById("search").value = "";
-    document.getElementById("appliedOnlyBtn").dataset.active = "0";
+    document.getElementById("viewedOnlyBtn").dataset.active = "0";
     renderChips();
     render();
   }});
@@ -1013,8 +991,6 @@ function mapsUrl(d) {{
   return `https://www.google.com/maps/search/?api=1&query=${{encodeURIComponent(d.addr)}}`;
 }}
 
-const CHECK_SVG =
-  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>';
 const STAR_SVG =
   '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.6l2.47 5.24 5.63.78-4.08 4.06.99 5.72L10 14.5l-5.01 2.9.99-5.72L1.9 7.62l5.63-.78L10 1.6z"/></svg>';
 const CLIPBOARD_SVG =
@@ -1026,8 +1002,7 @@ function ratingChip(rating) {{
 
 function card(d) {{
   const k = catColorVar(d.grp);
-  const isApplied = applied.has(d.id);
-  const isSelected = selected.has(d.id);
+  const isViewed = viewed.has(d.id);
   const hasNote = !!notes[d.id];
   const dist = d._liveDist != null ? d._liveDist : d.dist;
   const phoneHtml = d.phone
@@ -1035,14 +1010,13 @@ function card(d) {{
     : `<span class="btn disabled">No phone listed</span>`;
   const siteHtml = d.site ? `<a class="btn" href="${{d.site}}" target="_blank" rel="noopener">Website</a>` : "";
   return `
-  <div class="card" data-applied="${{isApplied ? 1 : 0}}" data-selected="${{isSelected ? 1 : 0}}">
+  <div class="card" data-viewed="${{isViewed ? 1 : 0}}">
     <div class="card-top">
-      <label class="select-box" title="Select for export">
-        <input type="checkbox" class="select-cb" data-id="${{d.id}}" ${{isSelected ? "checked" : ""}} />
-        <span class="select-mark"></span>
+      <label class="viewed-box" title="Mark viewed / select for export">
+        <input type="checkbox" class="viewed-cb" data-id="${{d.id}}" ${{isViewed ? "checked" : ""}} />
+        <span class="viewed-mark"></span>
       </label>
       <div class="card-name">${{d.name}}</div>
-      <button class="applied-btn" data-id="${{d.id}}" aria-pressed="${{isApplied}}" aria-label="Mark as applied" title="Mark as applied">${{CHECK_SVG}}</button>
     </div>
     <div class="tag-row">
       <span class="tag" style="background:var(--cat-${{k}}-bg);color:var(--cat-${{k}})">${{d.cat}}</span>
@@ -1061,17 +1035,9 @@ function card(d) {{
   </div>`;
 }}
 
-function setApplied(id, nowApplied) {{
-  if (nowApplied) applied.add(id);
-  else applied.delete(id);
-  saveApplied();
-  document.getElementById("appliedLabel").innerHTML = encouragementFor(applied.size);
-}}
-
 function render() {{
   const rows = filtered();
   document.getElementById("emptyState").style.display = rows.length ? "none" : "block";
-  document.getElementById("appliedLabel").innerHTML = encouragementFor(applied.size);
   if (state.view === "map") {{
     document.getElementById("countLabel").innerHTML = `${{rows.length}} pinned${{clearFiltersBtnHtml()}}`;
     wireClearFilters();
@@ -1089,23 +1055,11 @@ function renderList(rows) {{
   wireClearFilters();
   document.getElementById("loadMoreRow").style.display = rows.length > slice.length ? "flex" : "none";
 
-  grid.querySelectorAll(".applied-btn").forEach((btn) =>
-    btn.addEventListener("click", () => {{
-      const id = btn.dataset.id;
-      const nowApplied = !applied.has(id);
-      setApplied(id, nowApplied);
-      btn.setAttribute("aria-pressed", String(nowApplied));
-      btn.closest(".card").dataset.applied = nowApplied ? "1" : "0";
-    }})
-  );
-
-  grid.querySelectorAll(".select-cb").forEach((cb) =>
+  grid.querySelectorAll(".viewed-cb").forEach((cb) =>
     cb.addEventListener("change", () => {{
       const id = cb.dataset.id;
-      if (cb.checked) selected.add(id);
-      else selected.delete(id);
-      cb.closest(".card").dataset.selected = cb.checked ? "1" : "0";
-      updateExportBar();
+      setViewed(id, cb.checked);
+      cb.closest(".card").dataset.viewed = cb.checked ? "1" : "0";
     }})
   );
 
@@ -1159,7 +1113,7 @@ function renderLegend() {{
 }}
 
 function mapInfoHtml(d) {{
-  const isApplied = applied.has(d.id);
+  const isViewed = viewed.has(d.id);
   const phoneHtml = d.phone
     ? `<a class="btn primary" href="tel:${{d.phone.replace(/[^+\\d]/g, "")}}">Call ${{d.phone}}</a>`
     : `<span class="btn disabled">No phone listed</span>`;
@@ -1168,8 +1122,11 @@ function mapInfoHtml(d) {{
   const dist = d._liveDist != null ? d._liveDist : d.dist;
   return `
     <div class="card-top">
+      <label class="viewed-box" title="Mark viewed / select for export">
+        <input type="checkbox" class="viewed-cb-map" data-id="${{d.id}}" ${{isViewed ? "checked" : ""}} />
+        <span class="viewed-mark"></span>
+      </label>
       <div class="card-name">${{d.name}}</div>
-      <button class="applied-btn" data-id="${{d.id}}" aria-pressed="${{isApplied}}" aria-label="Mark as applied" title="Mark as applied">${{CHECK_SVG}}</button>
     </div>
     <div class="tag-row">
       <span class="tag" style="background:var(--cat-${{k}}-bg);color:var(--cat-${{k}})">${{d.cat}}</span>
@@ -1188,11 +1145,11 @@ function mapInfoHtml(d) {{
 function showMapInfo(d) {{
   const info = document.getElementById("mapInfo");
   info.innerHTML = mapInfoHtml(d);
-  info.querySelector(".applied-btn").addEventListener("click", (e) => {{
-    const btn = e.currentTarget;
-    const nowApplied = !applied.has(d.id);
-    setApplied(d.id, nowApplied);
-    btn.setAttribute("aria-pressed", String(nowApplied));
+  info.querySelector(".viewed-cb-map").addEventListener("change", (e) => {{
+    const cb = e.currentTarget;
+    setViewed(d.id, cb.checked);
+    const marker = mapMarkers.find((m) => m.__id === d.id);
+    if (marker) marker.setOpacity(cb.checked ? 0.45 : 1);
   }});
 }}
 
@@ -1388,8 +1345,9 @@ function renderMap(rows) {{
       position: {{ lat: d.lat, lng: d.lng }},
       icon: dotIcon(CAT_HEX[k]),
       title: d.name,
-      opacity: applied.has(d.id) ? 0.45 : 1,
+      opacity: viewed.has(d.id) ? 0.45 : 1,
     }});
+    marker.__id = d.id;
     marker.addListener("click", () => showMapInfo(d));
     return marker;
   }});
@@ -1475,9 +1433,9 @@ document.getElementById("sortSel").addEventListener("change", (e) => {{
   state.sort = val;
   render();
 }});
-document.getElementById("appliedOnlyBtn").addEventListener("click", (e) => {{
-  state.appliedOnly = !state.appliedOnly;
-  e.currentTarget.dataset.active = state.appliedOnly ? "1" : "0";
+document.getElementById("viewedOnlyBtn").addEventListener("click", (e) => {{
+  state.viewedOnly = !state.viewedOnly;
+  e.currentTarget.dataset.active = state.viewedOnly ? "1" : "0";
   state.visible = PAGE;
   render();
 }});
@@ -1486,11 +1444,11 @@ document.getElementById("loadMoreBtn").addEventListener("click", () => {{
   render();
 }});
 
-/* Select-a-few-and-copy: builds a plain-text summary of the checked cards
-   (name/category/address/phone/site/note) onto the clipboard, for pasting
-   into Notes or a message. */
+/* Copies the checked ("viewed") cards' info (name/category/address/phone/
+   site/note) to the clipboard as plain text, for pasting into Notes or a
+   message. */
 function exportText() {{
-  return DATA.filter((d) => selected.has(d.id))
+  return DATA.filter((d) => viewed.has(d.id))
     .map((d) => {{
       const lines = [`${{d.name}} \\u2014 ${{d.cat}}, ${{d.suburb}}`, d.addr];
       if (d.phone) lines.push(d.phone);
@@ -1502,9 +1460,9 @@ function exportText() {{
 }}
 function updateExportBar() {{
   const bar = document.getElementById("exportBar");
-  const n = selected.size;
+  const n = viewed.size;
   bar.style.display = n ? "flex" : "none";
-  document.getElementById("exportCount").textContent = `${{n}} selected`;
+  document.getElementById("exportCount").textContent = `${{n}} viewed`;
 }}
 document.getElementById("exportCopyBtn").addEventListener("click", async (e) => {{
   const btn = e.currentTarget;
@@ -1517,11 +1475,6 @@ document.getElementById("exportCopyBtn").addEventListener("click", async (e) => 
   setTimeout(() => {{
     btn.innerHTML = `${{CLIPBOARD_SVG}} Copy`;
   }}, 1500);
-}});
-document.getElementById("exportClearBtn").addEventListener("click", () => {{
-  selected.clear();
-  updateExportBar();
-  render();
 }});
 
 /* MacBook: "/" jumps to search like GitHub's search shortcut, Escape drops
