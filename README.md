@@ -82,11 +82,56 @@ GitHub Pages (configured via `gh api repos/<owner>/<repo>/pages`, branch
 ## 5. The resume builder
 
 ```bash
-python3 build_resume.py   # writes resume.html — no API key needed
+python3 build_resume.py   # writes resume.html (tailoring off until the Worker URL is set — see below)
 ```
 
 `resume.html` is a self-contained resume editor: fill in the form on the left,
-watch an A4 page render on the right, then export.
+watch an A4 page render on the right, then export. It has **four templates**
+(Centered, Left, Compact, and a two-column Sidebar), a curated set of fonts and
+accent colours (plus a custom-colour picker), an optional profile photo, and a
+**Links** section for LinkedIn/portfolio.
+
+### Business-aware tailoring (the AI feature)
+
+Pick a business — from the **Tailor for a business…** dropdown, or via the
+**Tailor résumé** button on any card in the jobs directory (which deep-links to
+`resume.html?biz=<place_id>`) — and the resume is re-tailored to it:
+
+- the **headline** and **summary** are rewritten to target that business, and
+  experience items, skills, and bullets are **reordered** to surface the most
+  relevant parts first;
+- a matching **cover letter** is generated (toggle **Resume / Letter**), editable
+  and exportable on its own;
+- it's all **non-destructive** — the base resume in `localStorage` is never
+  changed; tailoring is a separate layer you can **Clear**;
+- each tailored version is **saved** (under `lolo_resume_tailors`) so you can
+  re-open past ones from **Saved** without spending another API call.
+
+**Truthfulness is enforced, not hoped for.** The model may only rewrite the two
+header fields and *reorder* existing content — it returns item ids and bullet
+indices, and the Worker drops anything that doesn't match the submitted resume,
+so it can't invent an employer, date, or skill.
+
+This is the one part of the site that needs a backend: a tiny Cloudflare Worker
+in [`../rr-tailor-worker/`](../rr-tailor-worker/) holds the OpenAI key and makes
+the call. See that folder's README to deploy it, then rebuild with the URL:
+
+```bash
+TAILOR_WORKER_URL=https://rr-tailor.<subdomain>.workers.dev python3 build_resume.py
+```
+
+Until the Worker is deployed (`TAILOR_WORKER_URL` unset), everything else works
+and the tailoring picker just says it isn't set up yet.
+
+**Privacy.** Tailoring POSTs the resume to the Worker → OpenAI. The Worker is
+stateless and stores nothing; OpenAI's API doesn't train on API-submitted data by
+default. Everything else stays on the device. The photo, if added, is downscaled
+in-browser and stored as a data URI — it goes on the PDF but never the Word file
+(ATS-clean), and Australian employers generally don't expect one.
+
+**Templates & ATS.** All four templates print to PDF; the **Word export is always
+single-column** regardless of template, because two-column DOCX parses badly in
+applicant tracking systems.
 
 **What it borrows.** The document model and the page layout come from
 [Reactive Resume](https://github.com/amruthpillai/reactive-resume) (MIT) — the

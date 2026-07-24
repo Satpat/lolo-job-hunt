@@ -2,8 +2,11 @@
 // index.html when online, fall back to whatever was last cached when not.
 // Since all business data is inlined into index.html itself, a cached copy
 // gives full offline List-view browsing (search, filter, notes, applied) —
-// only the Map tab needs a live connection (Google Maps JS SDK).
-const CACHE = "lolo-job-hunt-v3";
+// only the Map tab needs a live connection (Google Maps JS SDK). The resume
+// builder also works offline (editing + PDF/Word export); only its "Tailor for
+// a business" call reaches the network (the Cloudflare Worker), so tailoring is
+// the one resume feature that needs a connection.
+const CACHE = "lolo-job-hunt-v4";
 const SHELL = ["./", "./index.html", "./resume.html", "./resume.baseline.json"];
 
 self.addEventListener("install", (event) => {

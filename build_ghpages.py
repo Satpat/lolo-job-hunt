@@ -1047,6 +1047,7 @@ function card(d) {{
       ${{phoneHtml}}
       <a class="btn" href="${{mapsUrl(d)}}" target="_blank" rel="noopener">Directions</a>
       ${{siteHtml}}
+      <a class="btn" href="resume.html?biz=${{d.id}}">Tailor r&eacute;sum&eacute;</a>
       <button class="btn note-btn ${{hasNote ? "has-note" : ""}}" data-id="${{d.id}}">${{hasNote ? "Note &#9998;" : "Add note"}}</button>
     </div>
     <textarea class="note-box" data-id="${{d.id}}" placeholder="e.g. asked for manager, follow up Tues" style="display:${{hasNote ? "block" : "none"}}">${{notes[d.id] || ""}}</textarea>
@@ -1157,6 +1158,7 @@ function mapInfoHtml(d) {{
       ${{phoneHtml}}
       <a class="btn" href="${{mapsUrl(d)}}" target="_blank" rel="noopener">Directions</a>
       ${{siteHtml}}
+      <a class="btn" href="resume.html?biz=${{d.id}}">Tailor r&eacute;sum&eacute;</a>
     </div>`;
 }}
 
